@@ -1,455 +1,643 @@
-# 🌡️ HỆ THỐNG GIÁM SÁT MÔI TRƯỜNG THÔNG MINH V2.0
+# 🌡️ HỆ THỐNG GIÁM SÁT MÔI TRƯỜNG IOT V3.0
 
-**Dự án IoT nâng cao - Chạy hoàn toàn trên Wokwi**
+**Dự án IoT hoàn chỉnh với ESP32 + Web Dashboard + Telegram Bot**
 
-![Version](https://img.shields.io/badge/version-2.0-blue)
-![Platform](https://img.shields.io/badge/platform-ESP32-orange)
-![License](https://img.shields.io/badge/license-MIT-green)
+![Version](https://img.shields.io/badge/version-3.0-blue)
+![Platform](https://img.shields.io/badge/ESP32-Wokwi-orange)
+![Python](https://img.shields.io/badge/Python-3.8+-green)
 
 ---
 
 ## 📁 CẤU TRÚC DỰ ÁN
 
 ```
-iot-environmental-monitor/
-├── src/
-│   └── main.cpp                  # Code chính (V2.0)
-├── platformio.ini                # Cấu hình PlatformIO
-├── wokwi.toml                    # Cấu hình Wokwi  
-├── diagram.json                  # Sơ đồ mạch
-├── README.md                     # Hướng dẫn sử dụng
-└── GIAI_THICH_TINH_NANG.md      # Giải thích chi tiết (MỚI!)
+iot-environmental-monitor-v3/
+│
+├── esp32/                          # ESP32 Code (Wokwi)
+│   ├── src/main.cpp
+│   ├── platformio.ini
+│   ├── wokwi.toml
+│   └── diagram.json
+│
+├── web-dashboard/                  # Web Dashboard
+│   ├── app.py                      # Flask Server
+│   ├── requirements.txt
+│   ├── templates/
+│   │   └── index.html
+│   └── static/
+│       ├── style.css
+│       └── app.js
+│
+├── telegram-bot/                   # Telegram Bot
+│   ├── bot.py
+│   └── requirements.txt
+│
+└── README.md
 ```
 
-**📖 Đọc file `GIAI_THICH_TINH_NANG.md` để hiểu rõ hơn về các tính năng!**
+---
+
+## 🚀 TÍNH NĂNG MỚI (V3.0)
+
+### ✨ ESP32 (Wokwi)
+- DHT22, LDR, MQ-2 sensors
+- 2 Relay (Quạt, Đèn)
+- Auto/Manual Mode
+- ThingSpeak + MQTT
+- LCD 3 trang
+
+### ✨ Web Dashboard (MỚI!)
+- Hiển thị real-time
+- Biểu đồ 24h
+- Thống kê
+- Responsive design
+- Auto refresh 10s
+
+### ✨ Telegram Bot (MỚI!)
+- Báo cáo tự động mỗi 15 phút
+- Cảnh báo khẩn cấp
+- Format đẹp với HTML
+- Emoji trực quan
 
 ---
 
-## 🚀 TÍNH NĂNG MỚI (V2.0)
+## ⚡ HƯỚNG DẪN CÀI ĐẶT
 
-### ✨ Cảm biến nâng cao
-- ✅ DHT22: Nhiệt độ & độ ẩm
-- ✅ LDR: Cường độ ánh sáng
-- ✅ **MQ-2: Cảm biến khí gas** (NEW!)
-- ✅ **Tính Heat Index** (NEW!)
-- ✅ **Tính Comfort Index (0-100)** (NEW!)
+### PHẦN 1: ESP32 (Wokwi)
 
-### ✨ Thiết bị điều khiển
-- ✅ 3 LED: Green/Red/Blue (trạng thái)
-- ✅ Buzzer: Cảnh báo
-- ✅ **2 Relay: Quạt & Đèn** (NEW!)
-- ✅ **Nút bấm: Chuyển Auto/Manual** (NEW!)
+#### Bước 1: Cài VS Code + Extensions
+- PlatformIO IDE
+- Wokwi Simulator
 
-### ✨ Kết nối IoT
-- ✅ ThingSpeak: 8 Fields (thay vì 3)
-- ✅ **MQTT Real-time** (NEW!)
-- ✅ **Remote Control qua MQTT** (NEW!)
-- ✅ WiFi tự động kết nối
+#### Bước 2: Tạo ThingSpeak Channel
+1. Vào https://thingspeak.com/ → Đăng ký
+2. Tạo Channel với **8 Fields**:
+   - Field 1: Temperature
+   - Field 2: Humidity
+   - Field 3: Light Level
+   - Field 4: Gas Level
+   - Field 5: Fan Status
+   - Field 6: Light Status
+   - Field 7: Heat Index
+   - Field 8: Comfort Index
 
-### ✨ Giao diện & Thống kê
-- ✅ **LCD 3 trang tự động chuyển** (NEW!)
-  - Trang 1: Dữ liệu cảm biến + chỉ số
-  - Trang 2: Trạng thái thiết bị
-  - Trang 3: Thống kê trung bình
-- ✅ **Serial Monitor đẹp với box** (NEW!)
+3. Lấy **Channel ID** và **Write API Key**
 
-### ✨ Tự động hóa thông minh
-- ✅ **Auto Mode**: Tự động bật/tắt quạt, đèn
-- ✅ **Manual Mode**: Điều khiển bằng MQTT
-- ✅ **Thống kê**: Đếm số lần đo, trung bình
+#### Bước 3: Cập nhật Code
+Mở `esp32/src/main.cpp`, sửa dòng 13-14:
+```cpp
+unsigned long channelID = 3123035;  // ← Thay số của bạn
+const char* writeAPIKey = "YOUR_KEY";  // ← Thay key của bạn
+```
 
----
-
-## ⚡ HƯỚNG DẪN NHANH
-
-### Bước 1: Cài đặt (như cũ)
-
-1. Tải **VS Code**: https://code.visualstudio.com/
-2. Cài Extensions:
-   - **PlatformIO IDE**
-   - **Wokwi Simulator**
-
-### Bước 2: Tạo dự án
-
-1. Tạo thư mục `iot-environmental-monitor`
-2. Copy 4 file đã cập nhật:
-   - `platformio.ini` (có thêm PubSubClient)
-   - `wokwi.toml`
-   - `diagram.json` (có thêm MQ-2, Relay, Button)
-   - `src/main.cpp` (code V2.0 nâng cao)
-
-### Bước 3: Cấu hình ThingSpeak
-
-**Lưu ý V2.0:** Cần tạo **8 Fields** (thay vì 3)
-
-1. Vào https://thingspeak.com/ → New Channel
-
-2. Điền Fields:
-   ```
-   Field 1: Temperature (°C)
-   Field 2: Humidity (%)
-   Field 3: Light Level
-   Field 4: Gas Level
-   Field 5: Fan Status (0/1)
-   Field 6: Light Status (0/1)
-   Field 7: Heat Index (°C)
-   Field 8: Comfort Index (0-100)
-   ```
-
-3. Copy Channel ID và Write API Key vào `main.cpp` (dòng 18-19)
-
-### Bước 4: Chạy dự án
-
+#### Bước 4: Build & Run
 ```bash
-# 1. Build
+cd esp32
 pio run
-
-# 2. Chạy Wokwi
-Ctrl+Shift+P → "Wokwi: Start Simulator"
+# Ctrl+Shift+P → Wokwi: Start Simulator
 ```
 
 ---
 
-## 🎮 CÁCH SỬ DỤNG
+### PHẦN 2: Web Dashboard
 
-### 1. Tương tác với cảm biến
-
-**Wokwi Simulator:**
-- Click **DHT22** → Kéo nhiệt độ/độ ẩm
-- Click **LDR** → Kéo ánh sáng
-- Click **MQ-2** → Kéo nồng độ gas
-
-### 2. Chuyển chế độ
-
-**Nút MODE (Button):**
-- Click để chuyển **Auto ↔ Manual**
-- **Auto Mode**: Tự động điều khiển Quạt/Đèn
-  - Quạt ON khi nhiệt độ > 30°C
-  - Đèn ON khi ánh sáng < 300
-- **Manual Mode**: Điều khiển qua MQTT
-
-### 3. LCD tự động chuyển trang
-
-**Mỗi 5 giây chuyển 1 trang:**
-```
-Trang 1: T:28.5C H:65% L:750 G:250
-         HI:29.2 CI:85
-         STATUS: EXCELLENT
-
-Trang 2: === DEVICES ===
-         Fan:   ON  (Auto)
-         Light: OFF (Auto)
-         Mode: AUTOMATIC
-
-Trang 3: === STATISTICS ===
-         Data Count: 125
-         Avg T: 28.3C
-         Avg H: 64.8%
+#### Bước 1: Cài Python
+```bash
+# Kiểm tra Python đã cài chưa
+python --version  # Cần Python 3.8+
 ```
 
-### 4. Quan sát LED
-
-- 💙 **LED Blue**: Đang kết nối WiFi
-- 💚 **LED Green**: Hệ thống OK
-- 🔴 **LED Red**: Cảnh báo
-- 🔊 **Buzzer**: Kêu khi có alert
-
-### 5. Điều khiển từ xa (MQTT)
-
-**Dùng MQTT Client** (MQTT Explorer, MQTTX):
-
+#### Bước 2: Cài thư viện
+```bash
+cd web-dashboard
+pip install -r requirements.txt
 ```
-Broker: test.mosquitto.org:1883
 
-Subscribe topics:
-- iot/env/data    → Nhận dữ liệu mỗi 5s
-- iot/env/status  → Nhận trạng thái hệ thống
+#### Bước 3: Cấu hình
+Mở `app.py`, sửa dòng 7-8:
+```python
+CHANNEL_ID = "3123035"  # ← Channel ID của bạn
+READ_API_KEY = "YOUR_READ_API_KEY"  # ← Read API Key (tùy chọn)
+```
 
-Publish to: iot/env/control
-Commands:
-- FAN_ON         → Bật quạt
-- FAN_OFF        → Tắt quạt
-- LIGHT_ON       → Bật đèn
-- LIGHT_OFF      → Tắt đèn
-- AUTO_MODE      → Chuyển chế độ tự động
-- MANUAL_MODE    → Chuyển chế độ thủ công
-- RESET_STATS    → Reset thống kê
+#### Bước 4: Chạy Server
+```bash
+python app.py
+```
+
+Mở browser: **http://localhost:5000**
+
+---
+
+### PHẦN 3: Telegram Bot
+
+#### Bước 1: Tạo Bot
+1. Mở Telegram → Chat với **@BotFather**
+2. Gửi: `/newbot`
+3. Đặt tên bot: `IoT Monitor Bot`
+4. Đặt username: `your_iot_bot`
+5. Nhận **Bot Token**: `123456:ABC-DEF...`
+
+#### Bước 2: Lấy Chat ID
+
+**Cách 1: Gửi tin cho bot**
+```
+1. Tìm bot vừa tạo trên Telegram
+2. Nhấn START
+3. Gửi tin nhắn bất kỳ
+4. Vào: https://api.telegram.org/bot<BOT_TOKEN>/getUpdates
+5. Tìm "chat":{"id":123456789}
+```
+
+**Cách 2: Dùng @userinfobot**
+```
+1. Chat với @userinfobot
+2. Gửi tin nhắn
+3. Bot trả về Chat ID của bạn
+```
+
+#### Bước 3: Cấu hình Bot
+Mở `telegram-bot/bot.py`, sửa dòng 6-7:
+```python
+BOT_TOKEN = "123456:ABC-DEF..."  # ← Bot Token
+CHAT_ID = "123456789"            # ← Chat ID của bạn
+```
+
+#### Bước 4: Cài thư viện
+```bash
+cd telegram-bot
+pip install -r requirements.txt
+```
+
+#### Bước 5: Chạy Bot
+```bash
+python bot.py
+```
+
+Bot sẽ:
+- Gửi test message
+- Gửi báo cáo ngay lập tức
+- Tự động gửi mỗi 15 phút
+
+---
+
+## 📊 DEMO
+
+### 1. ESP32 trên Wokwi
+```
+LCD Page 1:
+┌────────────────────┐
+│ T:28.5C H:65%      │
+│ L:750 G:250        │
+│ HI:29.2 CI:85      │
+│ STATUS: EXCELLENT  │
+└────────────────────┘
+```
+
+### 2. Web Dashboard
+```
+http://localhost:5000
+
+📊 Cards:
+- Nhiệt độ: 28.5°C ✅ Tốt
+- Độ ẩm: 65.3% ✅ Tốt
+- Ánh sáng: 750 lux ✅ Vừa phải
+- Khí gas: 250 ppm ✅ An toàn
+
+📈 Biểu đồ:
+- Nhiệt độ & Độ ẩm (24h)
+- Ánh sáng & Khí gas (24h)
+
+📊 Thống kê:
+- TB Nhiệt độ: 28.3°C
+- TB Độ ẩm: 64.8%
+- Số lần đo: 4320
+```
+
+### 3. Telegram Bot
+```
+🌡️ BÁO CÁO MÔI TRƯỜNG
+⏰ 22/10/2024 14:00:00
+
+━━━━━━━━━━━━━━━━━━━━
+📊 DỮ LIỆU CẢM BIẾN
+
+🌡️ Nhiệt độ: 28.5°C
+   Trạng thái: ✅ Tốt
+
+💧 Độ ẩm: 65.3%
+   Trạng thái: ✅ Tốt
+
+💡 Ánh sáng: 750 lux
+   Trạng thái: ✅ Vừa phải
+
+✅ Khí gas: 250 ppm
+   Trạng thái: ✅ An toàn
+
+━━━━━━━━━━━━━━━━━━━━
+📈 CHỈ SỐ TÍNH TOÁN
+
+🔥 Heat Index: 29.2°C
+😊 Comfort Index: 85/100
+   🙂 Tốt
+
+━━━━━━━━━━━━━━━━━━━━
+🎛️ THIẾT BỊ
+
+🌀 Quạt: BẬT ✅
+💡 Đèn: TẮT ⭕
 ```
 
 ---
 
-## 📊 OUTPUT MẪU
+## 🔧 SO SÁNH CÁC PHIÊN BẢN
 
-### Serial Monitor Output
-
-```
-========== DU LIEU CAM BIEN ==========
-Nhiet do      : 28.5 *C
-Do am         : 65.3 %
-Anh sang      : 750 lux
-Khi gas       : 250 ppm
-Chi so nhiet  : 29.2 *C
-Chi so thoai mai: 85/100
-
-========== THIET BI ==========
-Quat          : BAT
-Den           : TAT
-Che do        : TU DONG
-======================================
-
-→ Sending to ThingSpeak...
-✓ ThingSpeak: Success
-
-✓ MQTT: {"temp":28.5,"humid":65.3,"light":750,"gas":250,"fan":true,"light_relay":false,"heat_index":29.2,"comfort":85,"mode":"auto"}
-```
-
-### ThingSpeak Dashboard
-
-**8 Biểu đồ:**
-1. Temperature over time
-2. Humidity over time
-3. Light Level over time
-4. Gas Level over time
-5. Fan Status (0/1)
-6. Light Status (0/1)
-7. Heat Index over time
-8. Comfort Index over time
-
----
-
-## 🧮 CÔNG THỨC
-
-### Heat Index (Chỉ số nhiệt)
-```
-HI = c1 + c2*T + c3*RH + c4*T*RH + c5*T² + c6*RH² 
-     + c7*T²*RH + c8*T*RH² + c9*T²*RH²
-```
-Đánh giá cảm giác nhiệt thực tế khi có độ ẩm.
-
-### Comfort Index (Chỉ số thoải mái)
-```
-CI = (TempScore + HumidScore + LightScore + GasScore) / 4
-
-- TempScore  = 100 - |24 - T| * 5
-- HumidScore = 100 - |60 - RH| * 2
-- LightScore = Light / 10
-- GasScore   = 100 - Gas / 10
-```
-
-**Đánh giá:**
-- 80-100: Excellent (Tuyệt vời)
-- 60-79: Good (Tốt)
-- 40-59: Fair (Chấp nhận được)
-- 0-39: Poor (Kém)
-
----
-
-## 🎯 NGƯỠNG CẢNH BÁO
-
-| Tham số | Min | Max | Hành động |
-|---------|-----|-----|-----------|
-| Nhiệt độ | 15°C | 35°C | LED đỏ + Buzzer |
-| Độ ẩm | 30% | 80% | LED đỏ + Buzzer |
-| Ánh sáng | 300 | - | LED đỏ + Buzzer |
-| Khí gas | - | 400 | LED đỏ + Buzzer |
-
----
-
-## 🔧 TỰ ĐỘNG HÓA
-
-### Chế độ Auto
-
-**Quạt:**
-- ON: Nhiệt độ > 30°C
-- OFF: Nhiệt độ ≤ 28°C
-
-**Đèn:**
-- ON: Ánh sáng < 300
-- OFF: Ánh sáng ≥ 500
-
-### Chế độ Manual
-
-Điều khiển bằng MQTT commands (xem phần 5 ở trên).
-
----
-
-## 📈 SO SÁNH V1.0 vs V2.0
-
-| Tính năng | V1.0 | V2.0 |
-|-----------|------|------|
-| Cảm biến | DHT22, LDR | + MQ-2 |
-| Actuator | LED, Buzzer | + 2 Relay |
-| ThingSpeak Fields | 3 | 8 |
-| MQTT | ❌ | ✅ |
-| Remote Control | ❌ | ✅ |
-| Auto/Manual Mode | ❌ | ✅ |
-| LCD Pages | 1 | 3 |
-| Heat Index | ❌ | ✅ |
-| Comfort Index | ❌ | ✅ |
-| Statistics | ❌ | ✅ |
-| Button Input | ❌ | ✅ |
+| Tính năng | V1.0 | V2.0 | V3.0 |
+|-----------|------|------|------|
+| Cảm biến | 2 | 3 | 3 |
+| Relay | 0 | 2 | 2 |
+| ThingSpeak | 3 fields | 8 fields | 8 fields |
+| MQTT | ❌ | ✅ | ✅ |
+| Web Dashboard | ❌ | ❌ | ✅ |
+| Telegram Bot | ❌ | ❌ | ✅ |
+| Auto Mode | ❌ | ✅ | ✅ |
+| Biểu đồ | ❌ | ❌ | ✅ |
+| Thống kê | ❌ | ✅ | ✅ |
+| Cảnh báo tự động | ❌ | ❌ | ✅ |
 
 ---
 
 ## 🐛 KHẮC PHỤC LỖI
 
-### Lỗi: "PubSubClient.h not found"
-```bash
-# Kiểm tra platformio.ini có dòng:
-knolleary/PubSubClient@^2.8
+### ESP32 (Wokwi)
 
-# Build lại:
+**Lỗi: firmware.bin not found**
+```bash
+cd esp32
 pio run --target clean
 pio run
 ```
 
-### Lỗi: MQTT không kết nối
-```
-Kiểm tra Serial Monitor:
-- Có dòng "MQTT: OK!" không?
-- Nếu "Error: -2" → Broker đang bận, thử lại
-- Nếu "Error: -4" → Timeout, check WiFi
+**Lỗi: ThingSpeak 400**
+- Check Channel ID và API Key
+- Đảm bảo có đủ 8 Fields
+
+---
+
+### Web Dashboard
+
+**Lỗi: ModuleNotFoundError**
+```bash
+pip install -r requirements.txt
 ```
 
-### Relay không hoạt động
-```
-Trong Wokwi:
-- Relay hiển thị màu xanh = ON
-- Relay màu xám = OFF
-- Click để test thủ công
+**Lỗi: Port 5000 đang dùng**
+```python
+# Sửa trong app.py dòng cuối:
+app.run(debug=True, host='0.0.0.0', port=5001)  # Đổi port
 ```
 
-### LCD không chuyển trang
+**Dashboard không cập nhật**
+- Check ESP32 đang gửi data lên ThingSpeak
+- Xem Console browser (F12) để debug
+- Check Channel ID trong `app.py`
+
+---
+
+### Telegram Bot
+
+**Lỗi: Unauthorized**
+- Check Bot Token đúng chưa
+- Bot Token format: `123456:ABC-DEF...`
+
+**Lỗi: Chat not found**
+- Chat ID phải là số (không có dấu ngoặc)
+- Đảm bảo đã gửi tin cho bot trước
+- Thử lại với @userinfobot
+
+**Bot không gửi tin**
+- Check kết nối Internet
+- Thử test bằng browser:
+  ```
+  https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<CHAT_ID>&text=test
+  ```
+
+---
+
+## 📱 CÁCH SỬ DỤNG
+
+### 1. Chạy toàn bộ hệ thống
+
+```bash
+# Terminal 1: ESP32 (Wokwi)
+cd esp32
+pio run
+# Ctrl+Shift+P → Wokwi: Start
+
+# Terminal 2: Web Dashboard
+cd web-dashboard
+python app.py
+
+# Terminal 3: Telegram Bot
+cd telegram-bot
+python bot.py
 ```
-Đợi 5 giây, tự động chuyển
-Hoặc check code: lastPageChange
+
+### 2. Truy cập
+
+- **Wokwi**: VS Code (mạch mô phỏng)
+- **Web**: http://localhost:5000
+- **Telegram**: Nhận tin tự động mỗi 15 phút
+
+### 3. Tương tác
+
+**ESP32:**
+- Kéo cảm biến trên Wokwi
+- Nhấn nút MODE → Chuyển Auto/Manual
+- Xem Serial Monitor
+
+**Web Dashboard:**
+- Tự động refresh 10 giây
+- Click biểu đồ để zoom
+- Responsive trên mobile
+
+**Telegram:**
+- Nhận báo cáo tự động
+- Cảnh báo khẩn cấp khi gas > 600 ppm
+- Không cần thao tác gì
+
+---
+
+## 📈 LUỒNG DỮ LIỆU
+
+```
+┌─────────┐
+│ ESP32   │ ─┐
+│ (Wokwi) │  │
+└─────────┘  │
+             │ WiFi
+             ↓
+      ┌─────────────┐
+      │ ThingSpeak  │ ← Lưu trữ Cloud
+      │   (Cloud)   │
+      └─────────────┘
+             │
+        ┌────┴────┐
+        ↓         ↓
+  ┌──────────┐  ┌──────────┐
+  │   Web    │  │ Telegram │
+  │Dashboard │  │   Bot    │
+  └──────────┘  └──────────┘
+        ↓              ↓
+  Browser         Telegram App
+   (PC/Phone)      (Phone)
+```
+
+**Giải thích:**
+1. ESP32 đọc cảm biến → Gửi ThingSpeak (mỗi 20s)
+2. Web Dashboard đọc ThingSpeak → Hiển thị (mỗi 10s)
+3. Telegram Bot đọc ThingSpeak → Gửi báo cáo (mỗi 15 phút)
+
+---
+
+## 🎯 TÍNH NĂNG NỔI BẬT
+
+### 1. Web Dashboard
+
+**Ưu điểm:**
+- ✅ Xem dữ liệu real-time từ mọi nơi
+- ✅ Biểu đồ trực quan, dễ phân tích
+- ✅ Responsive: Chạy tốt trên điện thoại
+- ✅ Không cần cài app
+
+**Công nghệ:**
+- Backend: Flask (Python)
+- Frontend: HTML/CSS/JavaScript
+- Chart: Chart.js
+- API: RESTful
+
+**Các API có sẵn:**
+```
+GET /api/latest          → Dữ liệu mới nhất
+GET /api/history/24      → Lịch sử 24h
+GET /api/statistics      → Thống kê
 ```
 
 ---
 
-## 📱 TEST MQTT (Tùy chọn)
+### 2. Telegram Bot
 
-### Cài MQTT Client
+**Ưu điểm:**
+- ✅ Nhận thông báo trên điện thoại
+- ✅ Không cần mở app riêng
+- ✅ Lưu trữ lịch sử báo cáo
+- ✅ Cảnh báo khẩn cấp tức thì
 
-**Windows/Mac/Linux:**
-- MQTT Explorer: http://mqtt-explorer.com/
-- MQTTX: https://mqttx.app/
+**Tần suất:**
+- Báo cáo thường: Mỗi 15 phút
+- Kiểm tra khẩn cấp: Mỗi 1 phút
+- Cảnh báo ngay: Khi gas > 600 ppm
 
-### Kết nối
+**Có thể mở rộng:**
+- Điều khiển thiết bị qua lệnh
+- Gửi vào Group/Channel
+- Nhiều người nhận báo cáo
 
-```
-Host: test.mosquitto.org
-Port: 1883
-Client ID: (tự động)
+---
 
-Subscribe:
-- iot/env/data
-- iot/env/status
-```
+## 🔐 BẢO MẬT
 
-### Test Commands
+### ThingSpeak
+- Write API Key: Giữ bí mật (để gửi data)
+- Read API Key: Tùy chọn (nếu channel private)
 
-```
-Topic: iot/env/control
+### Telegram
+- Bot Token: GIỮ BÍ MẬT, không commit lên Git
+- Chat ID: Không quan trọng lắm
 
-Gửi: FAN_ON
-→ Quạt sẽ bật, màn hình hiển thị "Fan: ON (Man)"
+### Best Practices
+```python
+# ĐỪNG làm thế này:
+BOT_TOKEN = "123456:ABC-DEF..."  # Trong code
 
-Gửi: AUTO_MODE
-→ Chuyển về chế độ tự động
+# NÊN làm thế này:
+# Dùng file .env
+from dotenv import load_env
+load_env()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 ```
 
 ---
 
-## 📝 CHECKLIST V2.0
+## 📝 CHECKLIST ĐẦY ĐỦ
 
-### Cơ bản
-- [ ] VS Code + PlatformIO + Wokwi đã cài
-- [ ] Tạo đủ 4 file (platformio.ini, wokwi.toml, diagram.json, main.cpp)
-- [ ] ThingSpeak Channel có 8 Fields
-- [ ] Cập nhật Channel ID và API Key
-- [ ] Build thành công (`pio run`)
+### ESP32
 - [ ] Wokwi chạy được
+- [ ] LCD hiển thị dữ liệu
+- [ ] ThingSpeak nhận được data (check trên web)
+- [ ] 8 Fields có dữ liệu
 
-### Nâng cao
-- [ ] DHT22, LDR, MQ-2 hoạt động
-- [ ] LCD chuyển 3 trang tự động (mỗi 5s)
-- [ ] Nút MODE chuyển Auto/Manual
-- [ ] Relay Quạt tự động bật khi > 30°C
-- [ ] Relay Đèn tự động bật khi < 300
-- [ ] ThingSpeak hiển thị 8 biểu đồ
-- [ ] MQTT gửi data mỗi 5s
-- [ ] Test remote control qua MQTT
+### Web Dashboard
+- [ ] Flask server chạy (http://localhost:5000)
+- [ ] 4 cards hiển thị số liệu
+- [ ] 2 biểu đồ vẽ được
+- [ ] Thống kê hiển thị
+- [ ] Tự động refresh
+
+### Telegram Bot
+- [ ] Bot gửi test message thành công
+- [ ] Nhận báo cáo đầu tiên
+- [ ] Đợi 15 phút → Nhận báo cáo tiếp theo
+- [ ] Format tin nhắn đẹp (có emoji, bold)
 
 ---
 
-## 🎓 NỘI DUNG BÁO CÁO GỢI Ý
+## 🎓 HƯỚNG DẪN LÀM BÁO CÁO
 
-### Phần nâng cao có thể thêm:
+### Cấu trúc báo cáo đề xuất
 
-**1. Heat Index & Comfort Index**
-- Giải thích công thức
-- Ý nghĩa trong thực tế
-- So sánh với chuẩn ASHRAE
+**1. GIỚI THIỆU**
+- Vấn đề cần giải quyết
+- Mục tiêu dự án
+- Phạm vi ứng dụng
 
-**2. MQTT Protocol**
-- QoS levels
-- Publish/Subscribe model
-- So sánh với HTTP
+**2. CƠ SỞ LÝ THUYẾT**
+- ESP32, cảm biến (DHT22, LDR, MQ-2)
+- ThingSpeak API
+- Flask Web Framework
+- Telegram Bot API
+- Giao thức HTTP/REST
 
-**3. Tự động hóa**
-- Thuật toán điều khiển
-- Hysteresis (chống dao động)
-- State Machine diagram
+**3. THIẾT KẾ HỆ THỐNG**
+- Sơ đồ tổng thể (3 thành phần)
+- Sơ đồ mạch ESP32 (chụp Wokwi)
+- Sơ đồ luồng dữ liệu
+- Database schema (ThingSpeak 8 fields)
 
-**4. Thống kê**
-- Running average
-- Data logging
-- Trend analysis
+**4. THỰC HIỆN**
+- Code ESP32 (giải thích các hàm chính)
+- Code Web Dashboard (Flask routes)
+- Code Telegram Bot (lên lịch)
+- Quá trình test và debug
+
+**5. KẾT QUẢ**
+- Screenshot Wokwi
+- Screenshot Web Dashboard
+- Screenshot tin nhắn Telegram
+- Biểu đồ ThingSpeak
+- Bảng so sánh trước/sau
+
+**6. ĐÁNH GIÁ**
+- Ưu điểm: Hoàn chỉnh, đa nền tảng, dễ mở rộng
+- Nhược điểm: Phụ thuộc Internet, giới hạn ThingSpeak free
+- So sánh với các giải pháp tương tự
+
+**7. KẾT LUẬN & HƯỚNG PHÁT TRIỂN**
+- Đạt được mục tiêu
+- Ứng dụng thực tế
+- Mở rộng: Mobile app, AI/ML, nhiều phòng
+
+---
+
+## 🎬 KỊCH BẢN DEMO (10 PHÚT)
+
+### Phút 1-2: Giới thiệu
+*"Em xin giới thiệu đồ án IoT hoàn chỉnh với 3 thành phần: ESP32, Web Dashboard, và Telegram Bot."*
+
+### Phút 3-4: ESP32 (Wokwi)
+1. Mở VS Code → Show Wokwi Simulator
+2. Giải thích mạch: DHT22, LDR, MQ-2, Relay, LED
+3. Kéo nhiệt độ lên 35°C → LED đỏ sáng, Buzzer kêu
+4. Show Serial Monitor: Log chi tiết
+5. Show LCD: 3 trang tự động chuyển
+
+### Phút 5-6: Web Dashboard
+1. Mở browser: http://localhost:5000
+2. Show 4 cards real-time
+3. Show 2 biểu đồ 24h
+4. Show thống kê
+5. F5 refresh → Dữ liệu cập nhật
+
+### Phút 7-8: Telegram Bot
+1. Mở Telegram trên điện thoại
+2. Show báo cáo định kỳ (có sẵn)
+3. Giải thích format tin nhắn
+4. Show code lên lịch 15 phút
+
+### Phút 9-10: Tổng kết & Q&A
+1. Luồng dữ liệu: ESP32 → ThingSpeak → Web/Telegram
+2. Ưu điểm: Đa nền tảng, real-time, tự động
+3. Ứng dụng: Smart home, nhà kính, phòng server
+4. Trả lời câu hỏi
 
 ---
 
 ## 🚀 HƯỚNG PHÁT TRIỂN
 
-### Có thể mở rộng thêm:
+### Ngắn hạn (1-2 tuần)
+- [ ] Thêm database MySQL (lưu lâu dài)
+- [ ] Thêm user authentication (Web)
+- [ ] Export data ra CSV/Excel
+- [ ] Dark mode cho Web
 
-1. **Deep Sleep**: Tiết kiệm pin cho ESP32 chạy battery
-2. **SD Card**: Lưu log offline
-3. **Web Server**: ESP32 tự host web dashboard
-4. **Blynk**: Mobile app điều khiển
-5. **Machine Learning**: Dự đoán xu hướng với TensorFlow Lite
-6. **Multi-sensor**: Thêm nhiều phòng
-7. **Database**: MySQL/InfluxDB thay vì ThingSpeak
-8. **Grafana**: Dashboard chuyên nghiệp
+### Trung hạn (1-2 tháng)
+- [ ] Mobile App (React Native)
+- [ ] Điều khiển qua Telegram (bot commands)
+- [ ] Email notification
+- [ ] Grafana dashboard
+
+### Dài hạn (3-6 tháng)
+- [ ] AI/ML: Dự đoán xu hướng
+- [ ] Multi-room support
+- [ ] Video streaming (ESP32-CAM)
+- [ ] Voice control (Google Assistant)
 
 ---
 
 ## 📚 TÀI LIỆU THAM KHẢO
 
-- ESP32: https://docs.espressif.com/
-- PlatformIO: https://docs.platformio.org/
-- Wokwi: https://docs.wokwi.com/
-- ThingSpeak: https://www.mathworks.com/help/thingspeak/
-- MQTT: https://mqtt.org/
-- PubSubClient: https://pubsubclient.knolleary.net/
+### Công nghệ sử dụng
+- **ESP32**: https://docs.espressif.com/
+- **Flask**: https://flask.palletsprojects.com/
+- **Chart.js**: https://www.chartjs.org/
+- **Telegram Bot API**: https://core.telegram.org/bots/api
+- **ThingSpeak**: https://www.mathworks.com/help/thingspeak/
+
+### Học thêm
+- **Python Flask Tutorial**: https://www.tutorialspoint.com/flask/
+- **Telegram Bot Python**: https://github.com/python-telegram-bot/python-telegram-bot
+- **RESTful API Design**: https://restfulapi.net/
 
 ---
 
-## 📞 HỖ TRỢ
+## 💬 HỖ TRỢ
 
-Nếu gặp vấn đề:
-1. Check Serial Monitor để xem log chi tiết
-2. Đọc lại phần Khắc phục lỗi
-3. Kiểm tra kết nối mạng (WiFi icon trong Wokwi)
+### Gặp vấn đề?
+1. Đọc lại phần "Khắc phục lỗi"
+2. Check Serial Monitor / Console log
+3. Test từng thành phần riêng lẻ:
+   - ESP32: `pio device monitor`
+   - Web: Mở http://localhost:5000 trực tiếp
+   - Telegram: Test bằng API URL
+
+### Liên hệ
+- GitHub Issues: (link repo của bạn)
+- Email: your.email@example.com
+
+---
+
+## 📜 LICENSE
+
+MIT License - Tự do sử dụng cho mục đích học tập và nghiên cứu.
 
 ---
 
 <div align="center">
 
-**🎉 Chúc bạn thành công với dự án nâng cao! 🎉**
+**🎉 Chúc bạn thành công với dự án IoT hoàn chỉnh! 🎉**
 
-Version 2.0 - Advanced IoT Environmental Monitoring System
+**Version 3.0** - Complete IoT Solution
 
-Made with ❤️ for IoT Students
+Made with ❤️ by IoT Students
 
 </div>

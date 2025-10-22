@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Monitor V5.1</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌡️ IoT Environmental Monitor V5.1</h1>
+            <div class="status-bar">
+                <span id="connection-status" class="status-badge disconnected">Disconnected</span>
+                <span id="alert-badge" class="status-badge">OK</span>
+                <span id="fan-status" class="status-badge">Fan: OFF 🔴</span>
+                <span id="timestamp">--:--:--</span>
+            </div>
+        </header>
+
+        <!-- Sensor Cards -->
+        <div class="cards-grid">
+            <div class="card">
+                <div class="card-icon">🌡️</div>
+                <div class="card-content">
+                    <h3>Temperature</h3>
+                    <div class="card-value" id="temp-value">--°C</div>
+                    <div class="card-status" id="temp-status">Normal</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">💧</div>
+                <div class="card-content">
+                    <h3>Humidity</h3>
+                    <div class="card-value" id="humid-value">--%</div>
+                    <div class="card-status" id="humid-status">Normal</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">💡</div>
+                <div class="card-content">
+                    <h3>Light Level</h3>
+                    <div class="card-value" id="light-value">-- Lux</div>
+                    <div class="card-status" id="light-status">Normal</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">☁️</div>
+                <div class="card-content">
+                    <h3>Gas Level</h3>
+                    <div class="card-value" id="gas-value">-- PPM</div>
+                    <div class="card-status" id="gas-status">Safe</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">🔥</div>
+                <div class="card-content">
+                    <h3>Heat Index</h3>
+                    <div class="card-value" id="heat-value">--°C</div>
+                    <div class="card-status">Feels Like</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">😊</div>
+                <div class="card-content">
+                    <h3>Comfort Index</h3>
+                    <div class="card-value" id="comfort-value">--/100</div>
+                    <div class="card-status" id="comfort-status">--</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-section">
+            <h2>📈 Real-time Charts</h2>
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <canvas id="tempChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="humidChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Info -->
+        <div class="info-panel">
+            <h3>ℹ️ System Information</h3>
+            <ul>
+                <li>🌀 <strong>Auto Fan Control:</strong> ON when T ≥ 30°C, OFF when T ≤ 28°C</li>
+                <li>📊 <strong>Data Format:</strong> Temp (°C), Humid (%), Light (Lux), Gas (PPM)</li>
+                <li>🔄 <strong>Sensor Update:</strong> Every 2 seconds</li>
+                <li>☁️ <strong>ThingSpeak:</strong> Every 20 seconds</li>
+                <li>📡 <strong>MQTT:</strong> Every 5 seconds</li>
+                <li>💡 <strong>LED:</strong> Green=Safe, Red=Alert</li>
+                <li>🔊 <strong>Buzzer:</strong> Beeps on alert</li>
+                <li>🧪 <strong>Test Mode:</strong> Random sensor values for testing logic</li>
+            </ul>
+        </div>
+
+        <!-- Alert Thresholds -->
+        <div class="info-panel">
+            <h3>⚠️ Alert Thresholds</h3>
+            <ul>
+                <li>🌡️ <strong>Temperature:</strong> 15-35°C (Fan: 28-30°C hysteresis)</li>
+                <li>💧 <strong>Humidity:</strong> 30-80%</li>
+                <li>💡 <strong>Light:</strong> &gt; 200 Lux</li>
+                <li>☁️ <strong>Gas:</strong> &lt; 300 PPM</li>
+                <li>😊 <strong>Comfort:</strong> 0-60 (Poor), 60-80 (Good), 80-100 (Excellent)</li>
+            </ul>
+        </div>
+
+        <!-- Features -->
+        <div class="info-panel">
+            <h3>✨ Key Features</h3>
+            <ul>
+                <li>🎯 <strong>Comfort Index:</strong> Calculated from temp, humidity, light, gas levels</li>
+                <li>🔥 <strong>Heat Index:</strong> Real "feels-like" temperature</li>
+                <li>🌀 <strong>Smart Fan:</strong> Automatic temperature-based control with hysteresis</li>
+                <li>📱 <strong>Telegram Bot:</strong> Remote monitoring & alerts</li>
+                <li>🧪 <strong>Test Mode:</strong> Set TEST_MODE = true in code for random sensor values</li>
+            </ul>
+        </div>
+
+        <!-- Alerts Container -->
+        <div id="alerts-container"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

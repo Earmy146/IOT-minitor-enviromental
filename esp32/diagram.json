@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "author": "IoT Project V5.1 - Clean Layout",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 100,
+      "left": 200,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht1",
+      "top": -20,
+      "left": 50,
+      "attrs": { "temperature": "28", "humidity": "65" }
+    },
+    {
+      "type": "wokwi-photoresistor-sensor",
+      "id": "ldr1",
+      "top": -20,
+      "left": 450,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-gas-sensor",
+      "id": "mq2",
+      "top": -20,
+      "left": 600,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-lcd1602",
+      "id": "lcd_main",
+      "top": -200,
+      "left": 150,
+      "attrs": { "pins": "i2c" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_green",
+      "top": 300,
+      "left": 100,
+      "attrs": { "color": "green" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_red",
+      "top": 300,
+      "left": 200,
+      "attrs": { "color": "red" }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz1",
+      "top": 285.6,
+      "left": 310,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-relay-module",
+      "id": "relay_fan",
+      "top": 280,
+      "left": 450,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 343.2,
+      "left": 91.2,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": 343.2,
+      "left": 191.2,
+      "attrs": { "value": "220" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX0", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX0", "$serialMonitor:TX", "", [] ],
+    
+    [ "dht1:VCC", "esp:3V3", "red", [ "v0", "h100" ] ],
+    [ "dht1:GND", "esp:GND.1", "black", [ "v0", "h100" ] ],
+    [ "dht1:SDA", "esp:D15", "green", [ "v0", "h100" ] ],
+    
+    [ "ldr1:VCC", "esp:3V3", "red", [ "v0", "h-100" ] ],
+    [ "ldr1:GND", "esp:GND.1", "black", [ "v0", "h-100" ] ],
+    [ "ldr1:AO", "esp:D34", "orange", [ "v0", "h-100" ] ],
+    
+    [ "mq2:VCC", "esp:3V3", "red", [ "v0", "h-150" ] ],
+    [ "mq2:GND", "esp:GND.1", "black", [ "v0", "h-150" ] ],
+    [ "mq2:AO", "esp:D35", "yellow", [ "v0", "h-150" ] ],
+    
+    [ "lcd_main:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "lcd_main:VCC", "esp:5V", "red", [ "v0" ] ],
+    [ "lcd_main:SDA", "esp:D21", "blue", [ "v0" ] ],
+    [ "lcd_main:SCL", "esp:D22", "yellow", [ "v0" ] ],
+    
+    [ "led_green:A", "r1:1", "green", [ "v0" ] ],
+    [ "r1:2", "esp:D25", "green", [ "v10", "h30" ] ],
+    [ "led_green:C", "esp:GND.2", "black", [ "v0" ] ],
+    
+    [ "led_red:A", "r2:1", "red", [ "v0" ] ],
+    [ "r2:2", "esp:D26", "red", [ "v10", "h30" ] ],
+    [ "led_red:C", "esp:GND.2", "black", [ "v0" ] ],
+    
+    [ "bz1:1", "esp:D27", "orange", [ "v-10", "h-30" ] ],
+    [ "bz1:2", "esp:GND.2", "black", [ "v0" ] ],
+    
+    [ "relay_fan:VCC", "esp:3V3", "red", [ "v-10", "h-100" ] ],
+    [ "relay_fan:GND", "esp:GND.2", "black", [ "v0", "h-100" ] ],
+    [ "relay_fan:IN", "esp:D33", "purple", [ "v-10", "h-100" ] ]
+  ],
+  "dependencies": {}
+}
