@@ -38,10 +38,10 @@ max_history = 50
 
 # MQTT Callbacks
 def on_connect(client, userdata, flags, rc):
-    print(f"✓ Connected to MQTT Broker! (Code: {rc})")
+    print(f"✓ Da ket noi MQTT Broker! (Ma: {rc})")
     client.subscribe(MQTT_TOPIC_DATA)
     client.subscribe(MQTT_TOPIC_STATUS)
-    print(f"📡 Subscribed to:")
+    print(f"📡 Da dang ky:")
     print(f"   - {MQTT_TOPIC_DATA}")
     print(f"   - {MQTT_TOPIC_STATUS}")
 
@@ -61,21 +61,21 @@ def on_message(client, userdata, msg):
             
             socketio.emit('sensor_update', data)
             
-            print(f"📊 T={data['temp']}°C, H={data['humid']}%, L={data['light_lux']}Lux, G={data['gas_ppm']}PPM, Fan={'ON' if data['fan'] else 'OFF'}")
+            print(f"📊 T={data['temp']}°C, H={data['humid']}%, L={data['light_lux']}Lux, G={data['gas_ppm']}PPM, Quat={'BAT' if data['fan'] else 'TAT'}")
             
         elif msg.topic == MQTT_TOPIC_STATUS:
             status = msg.payload.decode()
-            print(f"📢 Status: {status}")
+            print(f"📢 Trang thai: {status}")
             socketio.emit('status_update', {'status': status})
             
     except json.JSONDecodeError as e:
-        print(f"✗ JSON Error: {e}")
+        print(f"✗ Loi JSON: {e}")
     except Exception as e:
-        print(f"✗ Error: {e}")
+        print(f"✗ Loi: {e}")
 
 def on_disconnect(client, userdata, rc):
     if rc != 0:
-        print(f"⚠️ MQTT disconnect. Reconnecting...")
+        print(f"⚠️ Mat ket noi MQTT. Dang ket noi lai...")
 
 # Khởi tạo MQTT
 mqtt_client = mqtt.Client()
@@ -85,11 +85,11 @@ mqtt_client.on_disconnect = on_disconnect
 
 def start_mqtt():
     try:
-        print(f"🔌 Connecting to MQTT: {MQTT_BROKER}:{MQTT_PORT}")
+        print(f"🔌 Dang ket noi MQTT: {MQTT_BROKER}:{MQTT_PORT}")
         mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
         mqtt_client.loop_forever()
     except Exception as e:
-        print(f"✗ MQTT Error: {e}")
+        print(f"✗ Loi MQTT: {e}")
 
 mqtt_thread = threading.Thread(target=start_mqtt, daemon=True)
 mqtt_thread.start()
@@ -115,42 +115,42 @@ def get_thingspeak():
             'results': 20,
             'api_key': THINGSPEAK_READ_API_KEY
         }
-        print(f"📡 Fetching ThingSpeak...")
+        print(f"📡 Dang lay du lieu ThingSpeak...")
         response = requests.get(url, params=params, timeout=10)
         data = response.json()
         
         if 'feeds' in data:
-            print(f"✓ Retrieved {len(data['feeds'])} records")
+            print(f"✓ Da lay {len(data['feeds'])} ban ghi")
         
         return jsonify(data)
     except Exception as e:
-        print(f"✗ ThingSpeak Error: {e}")
+        print(f"✗ Loi ThingSpeak: {e}")
         return jsonify({'error': str(e)}), 500
 
 # SocketIO Events
 @socketio.on('connect')
 def handle_connect():
-    print('✓ Web client connected')
+    print('✓ Khach web da ket noi')
     emit('sensor_update', latest_data)
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print('✗ Web client disconnected')
+    print('✗ Khach web mat ket noi')
 
 if __name__ == '__main__':
     print("\n" + "="*60)
-    print("  🌐 IoT Environmental Monitor V5.1")
+    print("  🌐 Hệ Thống Giám Sát Môi Trường IoT V5.1")
     print("="*60)
     print(f"  MQTT Broker   : {MQTT_BROKER}:{MQTT_PORT}")
     print(f"  ThingSpeak ID : {THINGSPEAK_CHANNEL_ID}")
-    print(f"  Server URL    : http://localhost:5000")
+    print(f"  URL may chu   : http://localhost:5000")
     print("="*60)
-    print("  📝 Features:")
-    print("     - Auto fan control (ON: ≥30°C, OFF: ≤28°C)")
-    print("     - Comfort index calculation")
-    print("     - Heat index monitoring")
-    print("     - TEST MODE: Random sensor values for testing")
-    print("     - REAL MODE: Actual sensor readings")
+    print("  📝 Tinh nang:")
+    print("     - Quat tu dong (BAT: ≥30°C, TAT: ≤28°C)")
+    print("     - Tinh toan chi so thoai mai")
+    print("     - Giam sat chi so nhiet")
+    print("     - CHE DO THU: Gia tri cam bien ngau nhien de kiem tra")
+    print("     - CHE DO THAT: Doc du lieu cam bien thuc te")
     print("="*60 + "\n")
     
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)

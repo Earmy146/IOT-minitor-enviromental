@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IoT Monitor V5.1</title>
+    <title>Hệ Thống Giám Sát IoT V5.1</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -11,75 +11,75 @@
 <body>
     <div class="container">
         <header>
-            <h1>🌡️ IoT Environmental Monitor V5.1</h1>
+            <h1>🌡️ Hệ Thống Giám Sát Môi Trường IoT V5.1</h1>
             <div class="status-bar">
-                <span id="connection-status" class="status-badge disconnected">Disconnected</span>
+                <span id="connection-status" class="status-badge disconnected">Mất kết nối</span>
                 <span id="alert-badge" class="status-badge">OK</span>
-                <span id="fan-status" class="status-badge">Fan: OFF 🔴</span>
+                <span id="fan-status" class="status-badge">Quạt: TẮT 🔴</span>
                 <span id="timestamp">--:--:--</span>
             </div>
         </header>
 
-        <!-- Sensor Cards -->
+        <!-- Thẻ cảm biến -->
         <div class="cards-grid">
             <div class="card">
                 <div class="card-icon">🌡️</div>
                 <div class="card-content">
-                    <h3>Temperature</h3>
+                    <h3>Nhiệt độ</h3>
                     <div class="card-value" id="temp-value">--°C</div>
-                    <div class="card-status" id="temp-status">Normal</div>
+                    <div class="card-status" id="temp-status">Bình thường</div>
                 </div>
             </div>
 
             <div class="card">
                 <div class="card-icon">💧</div>
                 <div class="card-content">
-                    <h3>Humidity</h3>
+                    <h3>Độ ẩm</h3>
                     <div class="card-value" id="humid-value">--%</div>
-                    <div class="card-status" id="humid-status">Normal</div>
+                    <div class="card-status" id="humid-status">Bình thường</div>
                 </div>
             </div>
 
             <div class="card">
                 <div class="card-icon">💡</div>
                 <div class="card-content">
-                    <h3>Light Level</h3>
+                    <h3>Ánh sáng</h3>
                     <div class="card-value" id="light-value">-- Lux</div>
-                    <div class="card-status" id="light-status">Normal</div>
+                    <div class="card-status" id="light-status">Bình thường</div>
                 </div>
             </div>
 
             <div class="card">
                 <div class="card-icon">☁️</div>
                 <div class="card-content">
-                    <h3>Gas Level</h3>
+                    <h3>Khí gas</h3>
                     <div class="card-value" id="gas-value">-- PPM</div>
-                    <div class="card-status" id="gas-status">Safe</div>
+                    <div class="card-status" id="gas-status">An toàn</div>
                 </div>
             </div>
 
             <div class="card">
                 <div class="card-icon">🔥</div>
                 <div class="card-content">
-                    <h3>Heat Index</h3>
+                    <h3>Chỉ số nhiệt</h3>
                     <div class="card-value" id="heat-value">--°C</div>
-                    <div class="card-status">Feels Like</div>
+                    <div class="card-status">Cảm giác như</div>
                 </div>
             </div>
 
             <div class="card">
                 <div class="card-icon">😊</div>
                 <div class="card-content">
-                    <h3>Comfort Index</h3>
+                    <h3>Chỉ số thoải mái</h3>
                     <div class="card-value" id="comfort-value">--/100</div>
                     <div class="card-status" id="comfort-status">--</div>
                 </div>
             </div>
         </div>
 
-        <!-- Charts -->
+        <!-- Biểu đồ -->
         <div class="charts-section">
-            <h2>📈 Real-time Charts</h2>
+            <h2>📈 Biểu đồ thời gian thực</h2>
             <div class="charts-grid">
                 <div class="chart-container">
                     <canvas id="tempChart"></canvas>
@@ -90,46 +90,46 @@
             </div>
         </div>
 
-        <!-- System Info -->
+        <!-- Thông tin hệ thống -->
         <div class="info-panel">
-            <h3>ℹ️ System Information</h3>
+            <h3>ℹ️ Thông tin hệ thống</h3>
             <ul>
-                <li>🌀 <strong>Auto Fan Control:</strong> ON when T ≥ 30°C, OFF when T ≤ 28°C</li>
-                <li>📊 <strong>Data Format:</strong> Temp (°C), Humid (%), Light (Lux), Gas (PPM)</li>
-                <li>🔄 <strong>Sensor Update:</strong> Every 2 seconds</li>
-                <li>☁️ <strong>ThingSpeak:</strong> Every 20 seconds</li>
-                <li>📡 <strong>MQTT:</strong> Every 5 seconds</li>
-                <li>💡 <strong>LED:</strong> Green=Safe, Red=Alert</li>
-                <li>🔊 <strong>Buzzer:</strong> Beeps on alert</li>
-                <li>🧪 <strong>Test Mode:</strong> Random sensor values for testing logic</li>
+                <li>🌀 <strong>Quạt tự động:</strong> BẬT khi nhiệt độ ≥ 30°C, TẮT khi nhiệt độ ≤ 28°C</li>
+                <li>📊 <strong>Định dạng dữ liệu:</strong> Nhiệt độ (°C), Độ ẩm (%), Ánh sáng (Lux), Khí gas (PPM)</li>
+                <li>🔄 <strong>Cập nhật cảm biến:</strong> Mỗi 2 giây</li>
+                <li>☁️ <strong>ThingSpeak:</strong> Mỗi 20 giây</li>
+                <li>📡 <strong>MQTT:</strong> Mỗi 5 giây</li>
+                <li>💡 <strong>Đèn LED:</strong> Xanh=An toàn, Đỏ=Cảnh báo</li>
+                <li>🔊 <strong>Còi báo:</strong> Kêu khi có cảnh báo</li>
+                <li>🧪 <strong>Chế độ thử nghiệm:</strong> Giá trị cảm biến ngẫu nhiên để kiểm tra logic</li>
             </ul>
         </div>
 
-        <!-- Alert Thresholds -->
+        <!-- Ngưỡng cảnh báo -->
         <div class="info-panel">
-            <h3>⚠️ Alert Thresholds</h3>
+            <h3>⚠️ Ngưỡng cảnh báo</h3>
             <ul>
-                <li>🌡️ <strong>Temperature:</strong> 15-35°C (Fan: 28-30°C hysteresis)</li>
-                <li>💧 <strong>Humidity:</strong> 30-80%</li>
-                <li>💡 <strong>Light:</strong> &gt; 200 Lux</li>
-                <li>☁️ <strong>Gas:</strong> &lt; 300 PPM</li>
-                <li>😊 <strong>Comfort:</strong> 0-60 (Poor), 60-80 (Good), 80-100 (Excellent)</li>
+                <li>🌡️ <strong>Nhiệt độ:</strong> 15-35°C (Quạt: trễ 28-30°C)</li>
+                <li>💧 <strong>Độ ẩm:</strong> 30-80%</li>
+                <li>💡 <strong>Ánh sáng:</strong> &gt; 200 Lux</li>
+                <li>☁️ <strong>Khí gas:</strong> &lt; 300 PPM</li>
+                <li>😊 <strong>Thoải mái:</strong> 0-60 (Kém), 60-80 (Tốt), 80-100 (Tuyệt vời)</li>
             </ul>
         </div>
 
-        <!-- Features -->
+        <!-- Tính năng -->
         <div class="info-panel">
-            <h3>✨ Key Features</h3>
+            <h3>✨ Tính năng chính</h3>
             <ul>
-                <li>🎯 <strong>Comfort Index:</strong> Calculated from temp, humidity, light, gas levels</li>
-                <li>🔥 <strong>Heat Index:</strong> Real "feels-like" temperature</li>
-                <li>🌀 <strong>Smart Fan:</strong> Automatic temperature-based control with hysteresis</li>
-                <li>📱 <strong>Telegram Bot:</strong> Remote monitoring & alerts</li>
-                <li>🧪 <strong>Test Mode:</strong> Set TEST_MODE = true in code for random sensor values</li>
+                <li>🎯 <strong>Chỉ số thoải mái:</strong> Tính toán từ nhiệt độ, độ ẩm, ánh sáng, mức khí gas</li>
+                <li>🔥 <strong>Chỉ số nhiệt:</strong> Nhiệt độ "cảm giác như" thực tế</li>
+                <li>🌀 <strong>Quạt thông minh:</strong> Điều khiển tự động dựa trên nhiệt độ có chế độ trễ</li>
+                <li>📱 <strong>Bot Telegram:</strong> Giám sát & cảnh báo từ xa</li>
+                <li>🧪 <strong>Chế độ thử nghiệm:</strong> Đặt TEST_MODE = true trong code để dùng giá trị ngẫu nhiên</li>
             </ul>
         </div>
 
-        <!-- Alerts Container -->
+        <!-- Vùng chứa thông báo -->
         <div id="alerts-container"></div>
     </div>
 

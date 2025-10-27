@@ -64,8 +64,8 @@ const unsigned long LCD_INTERVAL = 3000;
 // ===== NGƯỠNG CẢNH BÁO =====
 const float TEMP_MAX = 35.0;
 const float TEMP_MIN = 15.0;
-const float TEMP_FAN_ON = 30.0;   // Bật quạt khi >= 30°C
-const float TEMP_FAN_OFF = 28.0;  // Tắt quạt khi <= 28°C
+const float TEMP_FAN_ON = 30.0;
+const float TEMP_FAN_OFF = 28.0;
 const float HUMID_MAX = 80.0;
 const float HUMID_MIN = 30.0;
 const float LIGHT_MIN_LUX = 200.0;
@@ -86,8 +86,8 @@ void connectMQTT() {
     String clientId = "ESP32-" + String(random(0xffff), HEX);
     
     if (mqtt.connect(clientId.c_str())) {
-      Serial.println("OK!");
-      mqtt.publish(mqtt_topic_status, "online");
+      Serial.println("Thanh cong!");
+      mqtt.publish(mqtt_topic_status, "truc_tuyen");
     } else {
       Serial.print("Loi: ");
       Serial.println(mqtt.state());
@@ -105,9 +105,9 @@ void setup() {
   Serial.println("\n===========================================");
   Serial.println("  HE THONG GIAM SAT MOI TRUONG V5.1");
   if (TEST_MODE) {
-    Serial.println("  MODE: TEST (Random Values)");
+    Serial.println("  CHE DO: THU NGHIEM (Gia tri ngau nhien)");
   } else {
-    Serial.println("  MODE: REAL (Sensor Values)");
+    Serial.println("  CHE DO: THAT (Gia tri cam bien)");
   }
   Serial.println("===========================================");
   
@@ -132,16 +132,16 @@ void setup() {
   lcd.print("IoT Monitor v5.1");
   lcd.setCursor(0, 1);
   if (TEST_MODE) {
-    lcd.print("TEST MODE");
+    lcd.print("CHE DO THU");
   } else {
-    lcd.print("REAL MODE");
+    lcd.print("CHE DO THAT");
   }
   
   delay(2000);
   
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("WiFi...");
+  lcd.print("Ket noi WiFi...");
   Serial.print("WiFi: ");
   
   WiFi.begin(ssid, password);
@@ -153,18 +153,18 @@ void setup() {
   }
   
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println(" OK!");
-    Serial.print("IP: ");
+    Serial.println(" Thanh cong!");
+    Serial.print("Dia chi IP: ");
     Serial.println(WiFi.localIP());
     lcd.setCursor(0, 1);
-    lcd.print("Connected!");
+    lcd.print("Da ket noi!");
     digitalWrite(LED_GREEN, HIGH);
     delay(1000);
     digitalWrite(LED_GREEN, LOW);
   } else {
-    Serial.println(" FAIL!");
+    Serial.println(" That bai!");
     lcd.setCursor(0, 1);
-    lcd.print("Failed!");
+    lcd.print("Ket noi loi!");
   }
   
   ThingSpeak.begin(thingspeakClient);
@@ -185,41 +185,32 @@ void readSensors() {
   humidity = dht.readHumidity();
   
   if (isnan(temperature) || isnan(humidity)) {
-    Serial.println("⚠ DHT22 Error!");
-    temperature = 25.0;  // Giá trị mặc định
+    Serial.println("⚠ Loi DHT22!");
+    temperature = 25.0;
     humidity = 60.0;
   }
   
   if (TEST_MODE) {
-    // ===== CHẾ ĐỘ TEST: Giá trị ngẫu nhiên để test logic =====
+    // ===== CHẾ ĐỘ TEST: Giá trị ngẫu nhiên =====
+    lightLux = random(0, 1001);
+    lightLevel = map(lightLux, 0, 1000, 4095, 0);
     
-    // LDR: Giả lập ánh sáng từ 0-1000 Lux
-    lightLux = random(0, 1001);  // 0-1000 Lux
-    lightLevel = map(lightLux, 0, 1000, 4095, 0);  // Giả lập raw value
-    
-    // MQ2: Giả lập gas từ 0-500 PPM
-    gasPPM = random(0, 501);  // 0-500 PPM
-    gasLevel = map(gasPPM, 0, 500, 0, 2048);  // Giả lập raw value
+    gasPPM = random(0, 501);
+    gasLevel = map(gasPPM, 0, 500, 0, 2048);
     
   } else {
-    // ===== CHẾ ĐỘ THẬT: Đọc từ cảm biến analog =====
-    
-    // ĐỌC LDR
+    // ===== CHẾ ĐỘ THẬT: Đọc từ cảm biến =====
     lightLevel = analogRead(LDR_PIN);
-    // Wokwi LDR: Giá trị CAO = TỐI, THẤP = SÁNG
-    // Đảo ngược để có logic đúng
     int invertedLight = 4095 - lightLevel;
     lightLux = map(invertedLight, 0, 4095, 0, 1000);
     lightLux = constrain(lightLux, 0, 1000);
     
-    // ĐỌC MQ2
     gasLevel = analogRead(MQ2_PIN);
-    // Wokwi MQ2: Giá trị THẤP = KHÔNG GAS, CAO = CÓ GAS
     gasPPM = map(gasLevel, 0, 4095, 0, 1000);
     gasPPM = constrain(gasPPM, 0, 1000);
   }
   
-  // Tính Heat Index (cảm giác nhiệt độ)
+  // Tính Heat Index
   float c1 = -8.78469475556;
   float c2 = 1.61139411;
   float c3 = 2.33854883889;
@@ -236,7 +227,7 @@ void readSensors() {
               c8*temperature*humidity*humidity + 
               c9*temperature*temperature*humidity*humidity;
   
-  // Tính Comfort Index (0-100) - Chỉ số thoải mái tổng hợp
+  // Tính Comfort Index
   float tempScore = max(0.0f, 100.0f - abs(24.0f - temperature) * 5);
   float humidScore = max(0.0f, 100.0f - abs(60.0f - humidity) * 2);
   float lightScore = min(100.0f, (lightLux / 10.0f));
@@ -273,19 +264,17 @@ bool checkAlerts() {
 
 // ===== ĐIỀU KHIỂN QUẠT TỰ ĐỘNG =====
 void autoFanControl() {
-  // Bật quạt khi nhiệt độ >= 30°C
   if (temperature >= TEMP_FAN_ON && !fanStatus) {
     fanStatus = true;
     digitalWrite(RELAY_FAN, HIGH);
-    Serial.println("🌀 AUTO: Fan ON (T >= 30°C)");
-    mqtt.publish(mqtt_topic_status, "fan_auto_on");
+    Serial.println("🌀 TU DONG: Bat quat (T >= 30°C)");
+    mqtt.publish(mqtt_topic_status, "quat_bat_tu_dong");
   }
-  // Tắt quạt khi nhiệt độ <= 28°C (hysteresis để tránh bật tắt liên tục)
   else if (temperature <= TEMP_FAN_OFF && fanStatus) {
     fanStatus = false;
     digitalWrite(RELAY_FAN, LOW);
-    Serial.println("🌀 AUTO: Fan OFF (T <= 28°C)");
-    mqtt.publish(mqtt_topic_status, "fan_auto_off");
+    Serial.println("🌀 TU DONG: Tat quat (T <= 28°C)");
+    mqtt.publish(mqtt_topic_status, "quat_tat_tu_dong");
   }
 }
 
@@ -302,12 +291,12 @@ void controlIndicators() {
   }
 }
 
-// ===== CẬP NHẬT LCD (16x2) - HIỂN THỊ VIẾT TẮT LUÂN PHIÊN =====
+// ===== CẬP NHẬT LCD =====
 void updateLCD() {
   static unsigned long lastPageChange = 0;
   
   if (millis() - lastPageChange > LCD_INTERVAL) {
-    lcdPage = (lcdPage + 1) % 5;  // 5 trang
+    lcdPage = (lcdPage + 1) % 5;
     lastPageChange = millis();
     lcd.clear();
   }
@@ -321,11 +310,11 @@ void updateLCD() {
     lcd.print("C ");
     
     if (temperature > TEMP_MAX) {
-      lcd.print("HOT!");
+      lcd.print("NONG!");
     } else if (temperature < TEMP_MIN) {
-      lcd.print("COLD");
+      lcd.print("LANH");
     } else {
-      lcd.print("OK  ");
+      lcd.print("TOT ");
     }
     
     lcd.setCursor(0, 1);
@@ -334,66 +323,66 @@ void updateLCD() {
     lcd.print("% ");
     
     if (humidity > HUMID_MAX) {
-      lcd.print("HIGH");
+      lcd.print("CAO ");
     } else if (humidity < HUMID_MIN) {
-      lcd.print("LOW ");
+      lcd.print("THAP");
     } else {
-      lcd.print("OK  ");
+      lcd.print("TOT ");
     }
     
   } else if (lcdPage == 1) {
     // Trang 2: Ánh sáng
     lcd.setCursor(0, 0);
-    lcd.print("Light:");
+    lcd.print("Sang:");
     lcd.print((int)lightLux);
     lcd.print(" Lux  ");
     
     lcd.setCursor(0, 1);
     if (lightLux < LIGHT_MIN_LUX) {
-      lcd.print("Status: DARK  ");
+      lcd.print("Trang thai: TOI");
     } else {
-      lcd.print("Status: BRIGHT");
+      lcd.print("Trang thai: TOT");
     }
     
   } else if (lcdPage == 2) {
     // Trang 3: Khí gas
     lcd.setCursor(0, 0);
-    lcd.print("Gas:");
+    lcd.print("Khi:");
     lcd.print((int)gasPPM);
     lcd.print(" PPM   ");
     
     lcd.setCursor(0, 1);
     if (gasPPM > GAS_THRESHOLD_PPM) {
-      lcd.print("DANGER!!!     ");
+      lcd.print("NGUY HIEM!!!  ");
     } else {
-      lcd.print("Status: SAFE  ");
+      lcd.print("Trang thai: TOT");
     }
     
   } else if (lcdPage == 3) {
-    // Trang 4: Chỉ số thoải mái & Heat Index
+    // Trang 4: Chỉ số
     lcd.setCursor(0, 0);
-    lcd.print("Comfort:");
+    lcd.print("Thoai mai:");
     lcd.print(comfortIndex);
-    lcd.print("/100 ");
+    lcd.print("/100");
     
     lcd.setCursor(0, 1);
-    lcd.print("HeatIdx:");
+    lcd.print("Chi so:");
     lcd.print(heatIndex, 1);
     lcd.write(223);
     lcd.print("C  ");
     
   } else {
-    // Trang 5: Trạng thái hệ thống
+    // Trang 5: Trạng thái
     lcd.setCursor(0, 0);
     if (systemAlert) {
-      lcd.print("! ALERT !      ");
+      lcd.print("! CANH BAO !   ");
     } else {
-      lcd.print("System OK      ");
+      lcd.print("He thong TOT   ");
     }
     
     lcd.setCursor(0, 1);
-    lcd.print("Fan:");
-    lcd.print(fanStatus ? "ON " : "OFF");
+    lcd.print("Quat:");
+    lcd.print(fanStatus ? "BAT" : "TAT");
     lcd.print(" #");
     lcd.print(dataCount);
     lcd.print("    ");
@@ -404,7 +393,7 @@ void updateLCD() {
 void sendThingSpeak() {
   if (WiFi.status() != WL_CONNECTED) return;
   
-  Serial.println("\n→ Sending to ThingSpeak...");
+  Serial.println("\n→ Dang gui den ThingSpeak...");
   
   ThingSpeak.setField(1, temperature);
   ThingSpeak.setField(2, humidity);
@@ -418,9 +407,9 @@ void sendThingSpeak() {
   int status = ThingSpeak.writeFields(channelID, writeAPIKey);
   
   if (status == 200) {
-    Serial.println("✓ ThingSpeak: Success");
+    Serial.println("✓ ThingSpeak: Thanh cong");
   } else {
-    Serial.print("✗ ThingSpeak Error: ");
+    Serial.print("✗ Loi ThingSpeak: ");
     Serial.println(status);
   }
 }
@@ -453,40 +442,40 @@ void printSerial() {
   Serial.print("Nhiet do: ");
   Serial.print(temperature, 1);
   Serial.print(" °C ");
-  Serial.println(temperature > TEMP_MAX ? "[HOT]" : temperature < TEMP_MIN ? "[COLD]" : "[OK]");
+  Serial.println(temperature > TEMP_MAX ? "[NONG]" : temperature < TEMP_MIN ? "[LANH]" : "[TOT]");
   
   Serial.print("Do am   : ");
   Serial.print(humidity, 1);
   Serial.print(" % ");
-  Serial.println(humidity > HUMID_MAX ? "[HIGH]" : humidity < HUMID_MIN ? "[LOW]" : "[OK]");
+  Serial.println(humidity > HUMID_MAX ? "[CAO]" : humidity < HUMID_MIN ? "[THAP]" : "[TOT]");
   
   Serial.print("Anh sang: ");
   Serial.print(lightLux, 1);
   Serial.print(" Lux");
-  if (TEST_MODE) Serial.print(" [RANDOM]");
+  if (TEST_MODE) Serial.print(" [NGAU NHIEN]");
   else {
-    Serial.print(" (Raw:");
+    Serial.print(" (Tho:");
     Serial.print(lightLevel);
     Serial.print(")");
   }
-  Serial.println(lightLux < LIGHT_MIN_LUX ? " [DARK]" : " [BRIGHT]");
+  Serial.println(lightLux < LIGHT_MIN_LUX ? " [TOI]" : " [SANG]");
   
   Serial.print("Khi gas : ");
   Serial.print(gasPPM, 1);
   Serial.print(" PPM");
-  if (TEST_MODE) Serial.print(" [RANDOM]");
+  if (TEST_MODE) Serial.print(" [NGAU NHIEN]");
   else {
-    Serial.print(" (Raw:");
+    Serial.print(" (Tho:");
     Serial.print(gasLevel);
     Serial.print(")");
   }
-  Serial.println(gasPPM > GAS_THRESHOLD_PPM ? " [DANGER]" : " [SAFE]");
+  Serial.println(gasPPM > GAS_THRESHOLD_PPM ? " [NGUY HIEM]" : " [AN TOAN]");
   
-  Serial.print("Heat Index: ");
+  Serial.print("Chi so nhiet: ");
   Serial.print(heatIndex, 1);
   Serial.println(" °C");
   
-  Serial.print("Comfort   : ");
+  Serial.print("Thoai mai   : ");
   Serial.print(comfortIndex);
   Serial.println("/100");
   
@@ -495,7 +484,7 @@ void printSerial() {
   Serial.println(fanStatus ? "BAT" : "TAT");
   Serial.print("Canh bao: ");
   Serial.println(systemAlert ? "CO" : "KHONG");
-  Serial.print("Data #: ");
+  Serial.print("Du lieu #: ");
   Serial.println(dataCount);
   Serial.println("====================================\n");
 }
@@ -510,29 +499,25 @@ void loop() {
     connectMQTT();
   }
   
-  // Đọc cảm biến
   if (currentTime - lastSensorRead >= SENSOR_INTERVAL) {
     readSensors();
     checkAlerts();
-    autoFanControl();  // Điều khiển quạt tự động
+    autoFanControl();
     controlIndicators();
     printSerial();
     lastSensorRead = currentTime;
   }
   
-  // Cập nhật LCD
   if (currentTime - lastLCDUpdate >= LCD_INTERVAL) {
     updateLCD();
     lastLCDUpdate = currentTime;
   }
   
-  // Gửi ThingSpeak
   if (currentTime - lastThingSpeakUpdate >= THINGSPEAK_INTERVAL) {
     sendThingSpeak();
     lastThingSpeakUpdate = currentTime;
   }
   
-  // Gửi MQTT
   if (currentTime - lastMQTTUpdate >= MQTT_INTERVAL) {
     sendMQTT();
     lastMQTTUpdate = currentTime;

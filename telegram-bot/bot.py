@@ -14,7 +14,7 @@ MQTT_TOPIC_DATA = "iot/env/data"
 MQTT_TOPIC_STATUS = "iot/env/status"
 
 # Thời gian gửi dữ liệu tự động (giây)
-AUTO_SEND_INTERVAL = 30  # 5 phút
+AUTO_SEND_INTERVAL = 30  # 30 giây
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
@@ -38,7 +38,7 @@ alert_sent = {}
 
 # ===== MQTT CALLBACKS =====
 def on_connect(client, userdata, flags, rc):
-    print(f"✓ Connected to MQTT! (Code: {rc})")
+    print(f"✓ Da ket noi MQTT! (Ma: {rc})")
     client.subscribe(MQTT_TOPIC_DATA)
     client.subscribe(MQTT_TOPIC_STATUS)
 
@@ -53,9 +53,9 @@ def on_message(client, userdata, msg):
             check_alerts(data)
         elif msg.topic == MQTT_TOPIC_STATUS:
             status = msg.payload.decode()
-            print(f"📢 Status: {status}")
+            print(f"📢 Trang thai: {status}")
     except Exception as e:
-        print(f"✗ Error: {e}")
+        print(f"✗ Loi: {e}")
 
 mqtt_client = mqtt.Client()
 mqtt_client.on_connect = on_connect
@@ -66,11 +66,11 @@ def start_mqtt():
         mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
         mqtt_client.loop_forever()
     except Exception as e:
-        print(f"✗ MQTT Error: {e}")
+        print(f"✗ Loi MQTT: {e}")
 
 # ===== GỬI DỮ LIỆU TỰ ĐỘNG =====
 def auto_send_data():
-    print(f"✓ Auto-send started (interval: {AUTO_SEND_INTERVAL}s)")
+    print(f"✓ Da bat gui tu dong (khoang: {AUTO_SEND_INTERVAL}s)")
     
     while True:
         try:
@@ -92,8 +92,8 @@ def auto_send_data():
 💡 <b>Ánh sáng:</b> {data['light_lux']:.1f} Lux
 ☁️ <b>Khí gas:</b> {data['gas_ppm']:.1f} PPM
 
-🔥 <b>Heat Index:</b> {data['heat_index']:.1f}°C
-{comfort_emoji} <b>Comfort:</b> {data['comfort']}/100
+🔥 <b>Chỉ số nhiệt:</b> {data['heat_index']:.1f}°C
+{comfort_emoji} <b>Thoải mái:</b> {data['comfort']}/100
 
 {fan_emoji} <b>Quạt:</b> {'BẬT' if data['fan'] else 'TẮT'}
 {alert_emoji} <b>Trạng thái:</b> {'CẢNH BÁO!' if data['alert'] else 'Bình thường'}
@@ -104,14 +104,14 @@ def auto_send_data():
             for user_id in list(auto_data_users):
                 try:
                     bot.send_message(user_id, data_text, parse_mode='HTML')
-                    print(f"✓ Auto-sent to {user_id}")
+                    print(f"✓ Da gui tu dong den {user_id}")
                 except Exception as e:
-                    print(f"✗ Error sending to {user_id}: {e}")
+                    print(f"✗ Loi gui den {user_id}: {e}")
                     if "bot was blocked" in str(e).lower():
                         auto_data_users.discard(user_id)
                         
         except Exception as e:
-            print(f"✗ Auto-send error: {e}")
+            print(f"✗ Loi gui tu dong: {e}")
 
 # ===== KIỂM TRA CẢNH BÁO =====
 def check_alerts(data):
@@ -163,7 +163,7 @@ def check_alerts(data):
                 for alert in alerts:
                     bot.send_message(user_id, alert)
             except Exception as e:
-                print(f"✗ Error sending alert to {user_id}: {e}")
+                print(f"✗ Loi gui canh bao den {user_id}: {e}")
 
 # ===== TELEGRAM COMMANDS =====
 @bot.message_handler(commands=['start'])
@@ -172,11 +172,11 @@ def send_welcome(message):
     btn1 = types.KeyboardButton('📊 Dữ liệu')
     btn2 = types.KeyboardButton('🔔 Cảnh báo')
     btn3 = types.KeyboardButton('📈 Thống kê')
-    btn4 = types.KeyboardButton('⏰ Auto')
+    btn4 = types.KeyboardButton('⏰ Tự động')
     markup.add(btn1, btn2, btn3, btn4)
     
     welcome_text = """
-🌡️ <b>Chào mừng đến với IoT Monitor V5.1!</b>
+🌡️ <b>Chào mừng đến với Hệ Thống Giám Sát IoT V5.1!</b>
 
 Hệ thống giám sát môi trường thông minh.
 
@@ -185,7 +185,7 @@ Hệ thống giám sát môi trường thông minh.
 /data - Xem dữ liệu hiện tại
 /subscribe - Đăng ký cảnh báo
 /unsubscribe - Hủy cảnh báo
-/auto_on - Bật gửi dữ liệu tự động (5 phút)
+/auto_on - Bật gửi dữ liệu tự động (30 giây)
 /auto_off - Tắt gửi tự động
 /stats - Xem thống kê chi tiết
 /help - Hướng dẫn
@@ -201,14 +201,14 @@ def send_help(message):
 <b>📖 HƯỚNG DẪN SỬ DỤNG</b>
 
 <b>1. Xem dữ liệu:</b>
-   /data - Dữ liệu cảm biến realtime
+   /data - Dữ liệu cảm biến thời gian thực
 
 <b>2. Cảnh báo:</b>
    /subscribe - Nhận cảnh báo tự động
    /unsubscribe - Tắt cảnh báo
 
 <b>3. Gửi tự động:</b>
-   /auto_on - Nhận dữ liệu mỗi 5 phút
+   /auto_on - Nhận dữ liệu mỗi 30 giây
    /auto_off - Tắt gửi tự động
 
 <b>4. Thống kê:</b>
@@ -221,8 +221,8 @@ def send_help(message):
 ☠️ Khí gas: <300 PPM
 
 <b>Quạt tự động:</b>
-🌀 BẬT khi T ≥ 30°C
-🌀 TẮT khi T ≤ 28°C
+🌀 BẬT khi nhiệt độ ≥ 30°C
+🌀 TẮT khi nhiệt độ ≤ 28°C
     """
     bot.send_message(message.chat.id, help_text, parse_mode='HTML')
 
@@ -246,8 +246,8 @@ def send_data(message):
 {light_emoji} <b>Ánh sáng:</b> {data['light_lux']:.1f} Lux
 {gas_emoji} <b>Khí gas:</b> {data['gas_ppm']:.1f} PPM
 
-🔥 <b>Heat Index:</b> {data['heat_index']:.1f}°C
-{comfort_emoji} <b>Comfort:</b> {data['comfort']}/100
+🔥 <b>Chỉ số nhiệt:</b> {data['heat_index']:.1f}°C
+{comfort_emoji} <b>Thoải mái:</b> {data['comfort']}/100
 
 <b>━━━━━━━━━━━━━━━━━</b>
 
@@ -282,7 +282,7 @@ def auto_on(message):
     user_id = message.chat.id
     auto_data_users.add(user_id)
     bot.send_message(user_id, f"⏰ Đã bật gửi dữ liệu tự động!\n\n"
-                              f"Bạn sẽ nhận dữ liệu mỗi {AUTO_SEND_INTERVAL//60} phút.")
+                              f"Bạn sẽ nhận dữ liệu mỗi {AUTO_SEND_INTERVAL} giây.")
 
 @bot.message_handler(commands=['auto_off'])
 def auto_off(message):
@@ -307,7 +307,7 @@ def send_stats(message):
 
 <b>🌡️ Nhiệt độ:</b>
 └ Hiện tại: {data['temp']:.1f}°C
-└ Heat Index: {data['heat_index']:.1f}°C
+└ Chỉ số nhiệt: {data['heat_index']:.1f}°C
 └ Trạng thái: {temp_status}
 
 <b>💧 Độ ẩm:</b>
@@ -329,8 +329,8 @@ def send_stats(message):
 <b>🌀 Quạt:</b>
 └ Trạng thái: {'BẬT' if data['fan'] else 'TẮT'}
 └ Chế độ: TỰ ĐỘNG
-└ BẬT khi T ≥ 30°C
-└ TẮT khi T ≤ 28°C
+└ BẬT khi nhiệt độ ≥ 30°C
+└ TẮT khi nhiệt độ ≤ 28°C
 
 ⏰ Cập nhật lúc: {data['timestamp']}
     """
@@ -356,11 +356,11 @@ def handle_alert_button(message):
 def handle_stats_button(message):
     send_stats(message)
 
-@bot.message_handler(func=lambda message: message.text == '⏰ Auto')
+@bot.message_handler(func=lambda message: message.text == '⏰ Tự động')
 def handle_auto_button(message):
     user_id = message.chat.id
     if user_id in auto_data_users:
-        bot.send_message(user_id, f"⏰ Gửi tự động đang BẬT (mỗi {AUTO_SEND_INTERVAL//60} phút)\n\n"
+        bot.send_message(user_id, f"⏰ Gửi tự động đang BẬT (mỗi {AUTO_SEND_INTERVAL} giây)\n\n"
                                  "Gửi /auto_off để tắt.")
     else:
         bot.send_message(user_id, "⏰ Gửi tự động đang TẮT.\n\n"
@@ -369,10 +369,10 @@ def handle_auto_button(message):
 # ===== MAIN =====
 if __name__ == '__main__':
     print("\n" + "="*50)
-    print("  🤖 IoT Monitor V5.1 - Telegram Bot")
+    print("  🤖 Hệ Thống Giám Sát IoT V5.1 - Bot Telegram")
     print("="*50)
     print(f"  MQTT Broker: {MQTT_BROKER}:{MQTT_PORT}")
-    print(f"  Auto-send interval: {AUTO_SEND_INTERVAL}s")
+    print(f"  Khoang gui tu dong: {AUTO_SEND_INTERVAL}s")
     print("="*50 + "\n")
     
     # Chạy MQTT trong thread riêng
@@ -384,5 +384,5 @@ if __name__ == '__main__':
     auto_thread.start()
     
     # Chạy bot
-    print("✓ Bot is running! Press Ctrl+C to stop.\n")
+    print("✓ Bot dang chay! Nhan Ctrl+C de dung.\n")
     bot.polling(none_stop=True)

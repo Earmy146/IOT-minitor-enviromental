@@ -1,11 +1,11 @@
-// Socket.IO Connection
+// Kết nối Socket.IO
 const socket = io();
 
-// Charts
+// Biểu đồ
 let tempChart, humidChart;
 const maxDataPoints = 20;
 
-// Thresholds
+// Ngưỡng
 const TEMP_MAX = 35.0;
 const TEMP_MIN = 15.0;
 const TEMP_FAN_ON = 30.0;
@@ -14,7 +14,7 @@ const HUMID_MIN = 30.0;
 const LIGHT_MIN_LUX = 200.0;
 const GAS_THRESHOLD_PPM = 300.0;
 
-// Initialize Charts
+// Khởi tạo Biểu đồ
 function initCharts() {
     const chartConfig = {
         type: 'line',
@@ -43,7 +43,7 @@ function initCharts() {
         data: {
             labels: [],
             datasets: [{
-                label: 'Temperature (°C)',
+                label: 'Nhiệt độ (°C)',
                 data: [],
                 borderColor: 'rgb(239, 68, 68)',
                 backgroundColor: 'rgba(239, 68, 68, 0.1)',
@@ -58,7 +58,7 @@ function initCharts() {
         data: {
             labels: [],
             datasets: [{
-                label: 'Humidity (%)',
+                label: 'Độ ẩm (%)',
                 data: [],
                 borderColor: 'rgb(59, 130, 246)',
                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -68,15 +68,15 @@ function initCharts() {
     });
 }
 
-// Load ThingSpeak Historical Data
+// Tải dữ liệu lịch sử ThingSpeak
 async function loadThingSpeakData() {
     try {
-        console.log('📥 Loading ThingSpeak data...');
+        console.log('📥 Dang tai du lieu ThingSpeak...');
         const response = await fetch('/api/thingspeak');
         const data = await response.json();
         
         if (data.feeds && data.feeds.length > 0) {
-            console.log(`✓ Loaded ${data.feeds.length} records`);
+            console.log(`✓ Da tai ${data.feeds.length} ban ghi`);
             
             tempChart.data.labels = [];
             tempChart.data.datasets[0].data = [];
@@ -100,18 +100,18 @@ async function loadThingSpeakData() {
             tempChart.update();
             humidChart.update();
             
-            showAlert('success', 'Data Loaded', `Loaded ${data.feeds.length} records from ThingSpeak`);
+            showAlert('success', 'Đã tải dữ liệu', `Đã tải ${data.feeds.length} bản ghi từ ThingSpeak`);
         } else {
-            console.warn('⚠️ No data in ThingSpeak');
-            showAlert('warning', 'No Data', 'No historical data available');
+            console.warn('⚠️ Khong co du lieu trong ThingSpeak');
+            showAlert('warning', 'Không có dữ liệu', 'Không có dữ liệu lịch sử');
         }
     } catch (error) {
-        console.error('✗ Error loading ThingSpeak:', error);
-        showAlert('danger', 'Error', 'Failed to load data: ' + error.message);
+        console.error('✗ Loi tai ThingSpeak:', error);
+        showAlert('danger', 'Lỗi', 'Không thể tải dữ liệu: ' + error.message);
     }
 }
 
-// Update Charts with Real-time Data
+// Cập nhật Biểu đồ với dữ liệu thời gian thực
 function updateCharts(data) {
     const time = new Date().toLocaleTimeString();
 
@@ -132,103 +132,103 @@ function updateCharts(data) {
     humidChart.update('none');
 }
 
-// Update UI
+// Cập nhật giao diện
 function updateUI(data) {
-    console.log('🔄 Updating UI:', data);
+    console.log('🔄 Dang cap nhat giao dien:', data);
     
     document.getElementById('timestamp').textContent = data.timestamp || new Date().toLocaleTimeString();
 
-    // Temperature
+    // Nhiệt độ
     document.getElementById('temp-value').textContent = `${data.temp.toFixed(1)}°C`;
     const tempStatus = document.getElementById('temp-status');
     if (data.temp > TEMP_MAX) {
-        tempStatus.textContent = '⚠️ Too Hot';
+        tempStatus.textContent = '⚠️ Quá nóng';
         tempStatus.style.color = '#ef4444';
     } else if (data.temp < TEMP_MIN) {
-        tempStatus.textContent = '❄️ Too Cold';
+        tempStatus.textContent = '❄️ Quá lạnh';
         tempStatus.style.color = '#3b82f6';
     } else {
-        tempStatus.textContent = '✓ Normal';
+        tempStatus.textContent = '✓ Bình thường';
         tempStatus.style.color = '#10b981';
     }
 
-    // Humidity
+    // Độ ẩm
     document.getElementById('humid-value').textContent = `${data.humid.toFixed(1)}%`;
     const humidStatus = document.getElementById('humid-status');
     if (data.humid > HUMID_MAX) {
-        humidStatus.textContent = '⚠️ Too Humid';
+        humidStatus.textContent = '⚠️ Quá ẩm';
         humidStatus.style.color = '#ef4444';
     } else if (data.humid < HUMID_MIN) {
-        humidStatus.textContent = '⚠️ Too Dry';
+        humidStatus.textContent = '⚠️ Quá khô';
         humidStatus.style.color = '#f59e0b';
     } else {
-        humidStatus.textContent = '✓ Normal';
+        humidStatus.textContent = '✓ Bình thường';
         humidStatus.style.color = '#10b981';
     }
 
-    // Light
+    // Ánh sáng
     const lightValue = data.light_lux !== undefined ? data.light_lux : data.light;
     document.getElementById('light-value').textContent = `${parseFloat(lightValue).toFixed(1)} Lux`;
     const lightStatus = document.getElementById('light-status');
     if (lightValue < LIGHT_MIN_LUX) {
-        lightStatus.textContent = '💡 Dark';
+        lightStatus.textContent = '💡 Tối';
         lightStatus.style.color = '#f59e0b';
     } else {
-        lightStatus.textContent = '✓ Bright';
+        lightStatus.textContent = '✓ Sáng';
         lightStatus.style.color = '#10b981';
     }
 
-    // Gas
+    // Khí gas
     const gasValue = data.gas_ppm !== undefined ? data.gas_ppm : data.gas;
     document.getElementById('gas-value').textContent = `${parseFloat(gasValue).toFixed(1)} PPM`;
     const gasStatus = document.getElementById('gas-status');
     if (gasValue > GAS_THRESHOLD_PPM) {
-        gasStatus.textContent = '⚠️ Warning!';
+        gasStatus.textContent = '⚠️ Cảnh báo!';
         gasStatus.style.color = '#ef4444';
-        showAlert('danger', 'Gas Detected!', `Dangerous gas level: ${gasValue.toFixed(1)} PPM`);
+        showAlert('danger', 'Phát hiện khí gas!', `Mức độ nguy hiểm: ${gasValue.toFixed(1)} PPM`);
     } else {
-        gasStatus.textContent = '✓ Safe';
+        gasStatus.textContent = '✓ An toàn';
         gasStatus.style.color = '#10b981';
     }
 
-    // Heat Index
+    // Chỉ số nhiệt
     document.getElementById('heat-value').textContent = `${data.heat_index.toFixed(1)}°C`;
 
-    // Comfort Index
+    // Chỉ số thoải mái
     document.getElementById('comfort-value').textContent = `${data.comfort}/100`;
     const comfortStatus = document.getElementById('comfort-status');
     if (data.comfort >= 80) {
-        comfortStatus.textContent = '😊 Excellent';
+        comfortStatus.textContent = '😊 Tuyệt vời';
         comfortStatus.style.color = '#10b981';
     } else if (data.comfort >= 60) {
-        comfortStatus.textContent = '🙂 Good';
+        comfortStatus.textContent = '🙂 Tốt';
         comfortStatus.style.color = '#3b82f6';
     } else {
-        comfortStatus.textContent = '😟 Poor';
+        comfortStatus.textContent = '😟 Kém';
         comfortStatus.style.color = '#f59e0b';
     }
 
-    // Fan Status
-    document.getElementById('fan-status').textContent = `Fan: ${data.fan ? 'ON 🟢' : 'OFF 🔴'}`;
+    // Trạng thái quạt
+    document.getElementById('fan-status').textContent = `Quạt: ${data.fan ? 'BẬT 🟢' : 'TẮT 🔴'}`;
     document.getElementById('fan-status').style.color = data.fan ? '#10b981' : '#ef4444';
 
-    // Alert Status
+    // Trạng thái cảnh báo
     const alertBadge = document.getElementById('alert-badge');
     if (data.alert) {
-        alertBadge.textContent = 'ALERT';
+        alertBadge.textContent = 'CẢNH BÁO';
         alertBadge.className = 'status-badge alert';
     } else {
         alertBadge.textContent = 'OK';
         alertBadge.className = 'status-badge connected';
     }
 
-    // Update charts
+    // Cập nhật biểu đồ
     if (tempChart.data.labels.length > 0) {
         updateCharts(data);
     }
 }
 
-// Show Alert
+// Hiển thị thông báo
 function showAlert(type, title, message) {
     const alertContainer = document.getElementById('alerts-container');
     const alert = document.createElement('div');
@@ -245,34 +245,34 @@ function showAlert(type, title, message) {
     }, 5000);
 }
 
-// Socket Events
+// Sự kiện Socket
 socket.on('connect', () => {
-    console.log('✓ Connected to server');
-    document.getElementById('connection-status').textContent = 'Connected';
+    console.log('✓ Da ket noi may chu');
+    document.getElementById('connection-status').textContent = 'Đã kết nối';
     document.getElementById('connection-status').className = 'status-badge connected';
-    showAlert('success', 'Connected', 'Connected to server!');
+    showAlert('success', 'Đã kết nối', 'Đã kết nối máy chủ!');
 });
 
 socket.on('disconnect', () => {
-    console.log('✗ Disconnected');
-    document.getElementById('connection-status').textContent = 'Disconnected';
+    console.log('✗ Mat ket noi');
+    document.getElementById('connection-status').textContent = 'Mất kết nối';
     document.getElementById('connection-status').className = 'status-badge disconnected';
-    showAlert('danger', 'Disconnected', 'Connection lost!');
+    showAlert('danger', 'Mất kết nối', 'Đã mất kết nối!');
 });
 
 socket.on('sensor_update', (data) => {
-    console.log('📊 Sensor update:', data);
+    console.log('📊 Cap nhat cam bien:', data);
     updateUI(data);
 });
 
 socket.on('status_update', (data) => {
-    console.log('📢 Status:', data);
-    showAlert('info', 'Status Update', data.status);
+    console.log('📢 Trang thai:', data);
+    showAlert('info', 'Cập nhật trạng thái', data.status);
 });
 
-// Initialize
+// Khởi tạo
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Initializing dashboard...');
+    console.log('🚀 Dang khoi tao bang dieu khien...');
     initCharts();
     
     loadThingSpeakData();
@@ -280,10 +280,11 @@ document.addEventListener('DOMContentLoaded', () => {
     fetch('/api/data')
         .then(response => response.json())
         .then(data => {
-            console.log('📥 Initial data:', data);
+            console.log('📥 Du lieu ban dau:', data);
             updateUI(data);
         })
-        .catch(error => console.error('Error:', error));
+        .catch(error => console.error('Loi:', error));
     
+    // Tải lại dữ liệu ThingSpeak mỗi 5 phút
     setInterval(loadThingSpeakData, 5 * 60 * 1000);
 });
