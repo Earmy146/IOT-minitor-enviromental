@@ -1,22 +1,22 @@
-// Socket.IO Connection
-const socket = io();
+// Kết nối Socket.IO
+const ket_noi = io();
 
-// Charts
-let tempChart, humidChart;
-const maxDataPoints = 20;
+// Biểu đồ
+let bieuDoNhiet, bieuDoAm;
+const soLieuToiDa = 20;
 
-// Thresholds
-const TEMP_MAX = 35.0;
-const TEMP_MIN = 15.0;
-const TEMP_FAN_ON = 30.0;
-const HUMID_MAX = 80.0;
-const HUMID_MIN = 30.0;
-const LIGHT_MIN_LUX = 200.0;
-const GAS_THRESHOLD_PPM = 300.0;
+// Ngưỡng
+const NHIET_TOI_DA = 35.0;
+const NHIET_TOI_THIEU = 15.0;
+const NHIET_BAT_QUAT = 30.0;
+const AM_TOI_DA = 80.0;
+const AM_TOI_THIEU = 30.0;
+const SANG_TOI_THIEU_LUX = 200.0;
+const NGUONG_KHI_PPM = 300.0;
 
-// Initialize Charts
-function initCharts() {
-    const chartConfig = {
+// Khởi tạo Biểu đồ
+function khoiTaoBieuDo() {
+    const cauHinhBieuDo = {
         type: 'line',
         options: {
             responsive: true,
@@ -37,13 +37,13 @@ function initCharts() {
         }
     };
 
-    const tempCtx = document.getElementById('tempChart').getContext('2d');
-    tempChart = new Chart(tempCtx, {
-        ...chartConfig,
+    const ngUCanh_nhiet = document.getElementById('tempChart').getContext('2d');
+    bieuDoNhiet = new Chart(ngUCanh_nhiet, {
+        ...cauHinhBieuDo,
         data: {
             labels: [],
             datasets: [{
-                label: 'Temperature (°C)',
+                label: 'Nhiệt độ (°C)',
                 data: [],
                 borderColor: 'rgb(239, 68, 68)',
                 backgroundColor: 'rgba(239, 68, 68, 0.1)',
@@ -52,13 +52,13 @@ function initCharts() {
         }
     });
 
-    const humidCtx = document.getElementById('humidChart').getContext('2d');
-    humidChart = new Chart(humidCtx, {
-        ...chartConfig,
+    const ngUCanh_am = document.getElementById('humidChart').getContext('2d');
+    bieuDoAm = new Chart(ngUCanh_am, {
+        ...cauHinhBieuDo,
         data: {
             labels: [],
             datasets: [{
-                label: 'Humidity (%)',
+                label: 'Độ ẩm (%)',
                 data: [],
                 borderColor: 'rgb(59, 130, 246)',
                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -68,222 +68,223 @@ function initCharts() {
     });
 }
 
-// Load ThingSpeak Historical Data
-async function loadThingSpeakData() {
+// Tải dữ liệu lịch sử ThingSpeak
+async function taiDuLieuThingSpeak() {
     try {
-        console.log('📥 Loading ThingSpeak data...');
-        const response = await fetch('/api/thingspeak');
-        const data = await response.json();
+        console.log('📥 Dang tai du lieu ThingSpeak...');
+        const phanHoi = await fetch('/api/thingspeak');
+        const duLieu = await phanHoi.json();
         
-        if (data.feeds && data.feeds.length > 0) {
-            console.log(`✓ Loaded ${data.feeds.length} records`);
+        if (duLieu.feeds && duLieu.feeds.length > 0) {
+            console.log(`✓ Da tai ${duLieu.feeds.length} ban ghi`);
             
-            tempChart.data.labels = [];
-            tempChart.data.datasets[0].data = [];
-            humidChart.data.labels = [];
-            humidChart.data.datasets[0].data = [];
+            bieuDoNhiet.data.labels = [];
+            bieuDoNhiet.data.datasets[0].data = [];
+            bieuDoAm.data.labels = [];
+            bieuDoAm.data.datasets[0].data = [];
             
-            data.feeds.slice().reverse().forEach(feed => {
-                const timestamp = new Date(feed.created_at).toLocaleTimeString();
+            duLieu.feeds.slice().reverse().forEach(banGhi => {
+                const thoiGian = new Date(banGhi.created_at).toLocaleTimeString();
                 
-                if (feed.field1) {
-                    tempChart.data.labels.push(timestamp);
-                    tempChart.data.datasets[0].data.push(parseFloat(feed.field1));
+                if (banGhi.field1) {
+                    bieuDoNhiet.data.labels.push(thoiGian);
+                    bieuDoNhiet.data.datasets[0].data.push(parseFloat(banGhi.field1));
                 }
                 
-                if (feed.field2) {
-                    humidChart.data.labels.push(timestamp);
-                    humidChart.data.datasets[0].data.push(parseFloat(feed.field2));
+                if (banGhi.field2) {
+                    bieuDoAm.data.labels.push(thoiGian);
+                    bieuDoAm.data.datasets[0].data.push(parseFloat(banGhi.field2));
                 }
             });
             
-            tempChart.update();
-            humidChart.update();
+            bieuDoNhiet.update();
+            bieuDoAm.update();
             
-            showAlert('success', 'Data Loaded', `Loaded ${data.feeds.length} records from ThingSpeak`);
+            hienThiThongBao('success', 'Đã tải dữ liệu', `Đã tải ${duLieu.feeds.length} bản ghi từ ThingSpeak`);
         } else {
-            console.warn('⚠️ No data in ThingSpeak');
-            showAlert('warning', 'No Data', 'No historical data available');
+            console.warn('⚠️ Khong co du lieu trong ThingSpeak');
+            hienThiThongBao('warning', 'Không có dữ liệu', 'Không có dữ liệu lịch sử');
         }
-    } catch (error) {
-        console.error('✗ Error loading ThingSpeak:', error);
-        showAlert('danger', 'Error', 'Failed to load data: ' + error.message);
+    } catch (loi) {
+        console.error('✗ Loi tai ThingSpeak:', loi);
+        hienThiThongBao('danger', 'Lỗi', 'Không thể tải dữ liệu: ' + loi.message);
     }
 }
 
-// Update Charts with Real-time Data
-function updateCharts(data) {
-    const time = new Date().toLocaleTimeString();
+// Cập nhật Biểu đồ với dữ liệu thời gian thực
+function capNhatBieuDo(duLieu) {
+    const thoiGian = new Date().toLocaleTimeString();
 
-    if (tempChart.data.labels.length >= maxDataPoints) {
-        tempChart.data.labels.shift();
-        tempChart.data.datasets[0].data.shift();
+    if (bieuDoNhiet.data.labels.length >= soLieuToiDa) {
+        bieuDoNhiet.data.labels.shift();
+        bieuDoNhiet.data.datasets[0].data.shift();
     }
-    tempChart.data.labels.push(time);
-    tempChart.data.datasets[0].data.push(data.temp);
-    tempChart.update('none');
+    bieuDoNhiet.data.labels.push(thoiGian);
+    bieuDoNhiet.data.datasets[0].data.push(duLieu.nhiet_do);
+    bieuDoNhiet.update('none');
 
-    if (humidChart.data.labels.length >= maxDataPoints) {
-        humidChart.data.labels.shift();
-        humidChart.data.datasets[0].data.shift();
+    if (bieuDoAm.data.labels.length >= soLieuToiDa) {
+        bieuDoAm.data.labels.shift();
+        bieuDoAm.data.datasets[0].data.shift();
     }
-    humidChart.data.labels.push(time);
-    humidChart.data.datasets[0].data.push(data.humid);
-    humidChart.update('none');
+    bieuDoAm.data.labels.push(thoiGian);
+    bieuDoAm.data.datasets[0].data.push(duLieu.do_am);
+    bieuDoAm.update('none');
 }
 
-// Update UI
-function updateUI(data) {
-    console.log('🔄 Updating UI:', data);
+// Cập nhật giao diện
+function capNhatGiaoDien(duLieu) {
+    console.log('🔄 Dang cap nhat giao dien:', duLieu);
     
-    document.getElementById('timestamp').textContent = data.timestamp || new Date().toLocaleTimeString();
+    document.getElementById('timestamp').textContent = duLieu.thoi_gian || new Date().toLocaleTimeString();
 
-    // Temperature
-    document.getElementById('temp-value').textContent = `${data.temp.toFixed(1)}°C`;
-    const tempStatus = document.getElementById('temp-status');
-    if (data.temp > TEMP_MAX) {
-        tempStatus.textContent = '⚠️ Too Hot';
-        tempStatus.style.color = '#ef4444';
-    } else if (data.temp < TEMP_MIN) {
-        tempStatus.textContent = '❄️ Too Cold';
-        tempStatus.style.color = '#3b82f6';
+    // Nhiệt độ
+    document.getElementById('temp-value').textContent = `${duLieu.nhiet_do.toFixed(1)}°C`;
+    const trangThaiNhiet = document.getElementById('temp-status');
+    if (duLieu.nhiet_do > NHIET_TOI_DA) {
+        trangThaiNhiet.textContent = '⚠️ Quá nóng';
+        trangThaiNhiet.style.color = '#ef4444';
+    } else if (duLieu.nhiet_do < NHIET_TOI_THIEU) {
+        trangThaiNhiet.textContent = '❄️ Quá lạnh';
+        trangThaiNhiet.style.color = '#3b82f6';
     } else {
-        tempStatus.textContent = '✓ Normal';
-        tempStatus.style.color = '#10b981';
+        trangThaiNhiet.textContent = '✓ Bình thường';
+        trangThaiNhiet.style.color = '#10b981';
     }
 
-    // Humidity
-    document.getElementById('humid-value').textContent = `${data.humid.toFixed(1)}%`;
-    const humidStatus = document.getElementById('humid-status');
-    if (data.humid > HUMID_MAX) {
-        humidStatus.textContent = '⚠️ Too Humid';
-        humidStatus.style.color = '#ef4444';
-    } else if (data.humid < HUMID_MIN) {
-        humidStatus.textContent = '⚠️ Too Dry';
-        humidStatus.style.color = '#f59e0b';
+    // Độ ẩm
+    document.getElementById('humid-value').textContent = `${duLieu.do_am.toFixed(1)}%`;
+    const trangThaiAm = document.getElementById('humid-status');
+    if (duLieu.do_am > AM_TOI_DA) {
+        trangThaiAm.textContent = '⚠️ Quá ẩm';
+        trangThaiAm.style.color = '#ef4444';
+    } else if (duLieu.do_am < AM_TOI_THIEU) {
+        trangThaiAm.textContent = '⚠️ Quá khô';
+        trangThaiAm.style.color = '#f59e0b';
     } else {
-        humidStatus.textContent = '✓ Normal';
-        humidStatus.style.color = '#10b981';
+        trangThaiAm.textContent = '✓ Bình thường';
+        trangThaiAm.style.color = '#10b981';
     }
 
-    // Light
-    const lightValue = data.light_lux !== undefined ? data.light_lux : data.light;
-    document.getElementById('light-value').textContent = `${parseFloat(lightValue).toFixed(1)} Lux`;
-    const lightStatus = document.getElementById('light-status');
-    if (lightValue < LIGHT_MIN_LUX) {
-        lightStatus.textContent = '💡 Dark';
-        lightStatus.style.color = '#f59e0b';
+    // Ánh sáng
+    const giaTriSang = duLieu.anh_sang_lux !== undefined ? duLieu.anh_sang_lux : duLieu.anh_sang;
+    document.getElementById('light-value').textContent = `${parseFloat(giaTriSang).toFixed(1)} Lux`;
+    const trangThaiSang = document.getElementById('light-status');
+    if (giaTriSang < SANG_TOI_THIEU_LUX) {
+        trangThaiSang.textContent = '💡 Tối';
+        trangThaiSang.style.color = '#f59e0b';
     } else {
-        lightStatus.textContent = '✓ Bright';
-        lightStatus.style.color = '#10b981';
+        trangThaiSang.textContent = '✓ Sáng';
+        trangThaiSang.style.color = '#10b981';
     }
 
-    // Gas
-    const gasValue = data.gas_ppm !== undefined ? data.gas_ppm : data.gas;
-    document.getElementById('gas-value').textContent = `${parseFloat(gasValue).toFixed(1)} PPM`;
-    const gasStatus = document.getElementById('gas-status');
-    if (gasValue > GAS_THRESHOLD_PPM) {
-        gasStatus.textContent = '⚠️ Warning!';
-        gasStatus.style.color = '#ef4444';
-        showAlert('danger', 'Gas Detected!', `Dangerous gas level: ${gasValue.toFixed(1)} PPM`);
+    // Khí gas
+    const giaTriKhi = duLieu.khi_ppm !== undefined ? duLieu.khi_ppm : duLieu.khi;
+    document.getElementById('gas-value').textContent = `${parseFloat(giaTriKhi).toFixed(1)} PPM`;
+    const trangThaiKhi = document.getElementById('gas-status');
+    if (giaTriKhi > NGUONG_KHI_PPM) {
+        trangThaiKhi.textContent = '⚠️ Cảnh báo!';
+        trangThaiKhi.style.color = '#ef4444';
+        hienThiThongBao('danger', 'Phát hiện khí gas!', `Mức độ nguy hiểm: ${giaTriKhi.toFixed(1)} PPM`);
     } else {
-        gasStatus.textContent = '✓ Safe';
-        gasStatus.style.color = '#10b981';
+        trangThaiKhi.textContent = '✓ An toàn';
+        trangThaiKhi.style.color = '#10b981';
     }
 
-    // Heat Index
-    document.getElementById('heat-value').textContent = `${data.heat_index.toFixed(1)}°C`;
+    // Chỉ số nhiệt
+    document.getElementById('heat-value').textContent = `${duLieu.chi_so_nhiet.toFixed(1)}°C`;
 
-    // Comfort Index
-    document.getElementById('comfort-value').textContent = `${data.comfort}/100`;
-    const comfortStatus = document.getElementById('comfort-status');
-    if (data.comfort >= 80) {
-        comfortStatus.textContent = '😊 Excellent';
-        comfortStatus.style.color = '#10b981';
-    } else if (data.comfort >= 60) {
-        comfortStatus.textContent = '🙂 Good';
-        comfortStatus.style.color = '#3b82f6';
+    // Chỉ số thoải mái
+    document.getElementById('comfort-value').textContent = `${duLieu.thoai_mai}/100`;
+    const trangThaiThoaiMai = document.getElementById('comfort-status');
+    if (duLieu.thoai_mai >= 80) {
+        trangThaiThoaiMai.textContent = '😊 Tuyệt vời';
+        trangThaiThoaiMai.style.color = '#10b981';
+    } else if (duLieu.thoai_mai >= 60) {
+        trangThaiThoaiMai.textContent = '🙂 Tốt';
+        trangThaiThoaiMai.style.color = '#3b82f6';
     } else {
-        comfortStatus.textContent = '😟 Poor';
-        comfortStatus.style.color = '#f59e0b';
+        trangThaiThoaiMai.textContent = '😟 Kém';
+        trangThaiThoaiMai.style.color = '#f59e0b';
     }
 
-    // Fan Status
-    document.getElementById('fan-status').textContent = `Fan: ${data.fan ? 'ON 🟢' : 'OFF 🔴'}`;
-    document.getElementById('fan-status').style.color = data.fan ? '#10b981' : '#ef4444';
+    // Trạng thái quạt
+    document.getElementById('fan-status').textContent = `Quạt: ${duLieu.quat ? 'BẬT 🟢' : 'TẮT 🔴'}`;
+    document.getElementById('fan-status').style.color = duLieu.quat ? '#10b981' : '#ef4444';
 
-    // Alert Status
-    const alertBadge = document.getElementById('alert-badge');
-    if (data.alert) {
-        alertBadge.textContent = 'ALERT';
-        alertBadge.className = 'status-badge alert';
+    // Trạng thái cảnh báo
+    const huyHieuCanhBao = document.getElementById('alert-badge');
+    if (duLieu.canh_bao) {
+        huyHieuCanhBao.textContent = 'CẢNH BÁO';
+        huyHieuCanhBao.className = 'status-badge alert';
     } else {
-        alertBadge.textContent = 'OK';
-        alertBadge.className = 'status-badge connected';
+        huyHieuCanhBao.textContent = 'OK';
+        huyHieuCanhBao.className = 'status-badge connected';
     }
 
-    // Update charts
-    if (tempChart.data.labels.length > 0) {
-        updateCharts(data);
+    // Cập nhật biểu đồ
+    if (bieuDoNhiet.data.labels.length > 0) {
+        capNhatBieuDo(duLieu);
     }
 }
 
-// Show Alert
-function showAlert(type, title, message) {
-    const alertContainer = document.getElementById('alerts-container');
-    const alert = document.createElement('div');
-    alert.className = `alert alert-${type}`;
-    alert.innerHTML = `
-        <strong>${title}</strong><br>
-        ${message}
+// Hiển thị thông báo
+function hienThiThongBao(loai, tieuDe, noiDung) {
+    const hopThongBao = document.getElementById('alerts-container');
+    const thongBao = document.createElement('div');
+    thongBao.className = `alert alert-${loai}`;
+    thongBao.innerHTML = `
+        <strong>${tieuDe}</strong><br>
+        ${noiDung}
     `;
-    alertContainer.appendChild(alert);
+    hopThongBao.appendChild(thongBao);
 
     setTimeout(() => {
-        alert.style.opacity = '0';
-        setTimeout(() => alert.remove(), 300);
+        thongBao.style.opacity = '0';
+        setTimeout(() => thongBao.remove(), 300);
     }, 5000);
 }
 
-// Socket Events
-socket.on('connect', () => {
-    console.log('✓ Connected to server');
-    document.getElementById('connection-status').textContent = 'Connected';
+// Sự kiện Socket
+ket_noi.on('connect', () => {
+    console.log('✓ Da ket noi may chu');
+    document.getElementById('connection-status').textContent = 'Đã kết nối';
     document.getElementById('connection-status').className = 'status-badge connected';
-    showAlert('success', 'Connected', 'Connected to server!');
+    hienThiThongBao('success', 'Đã kết nối', 'Đã kết nối máy chủ!');
 });
 
-socket.on('disconnect', () => {
-    console.log('✗ Disconnected');
-    document.getElementById('connection-status').textContent = 'Disconnected';
+ket_noi.on('disconnect', () => {
+    console.log('✗ Mat ket noi');
+    document.getElementById('connection-status').textContent = 'Mất kết nối';
     document.getElementById('connection-status').className = 'status-badge disconnected';
-    showAlert('danger', 'Disconnected', 'Connection lost!');
+    hienThiThongBao('danger', 'Mất kết nối', 'Đã mất kết nối!');
 });
 
-socket.on('sensor_update', (data) => {
-    console.log('📊 Sensor update:', data);
-    updateUI(data);
+ket_noi.on('sensor_update', (duLieu) => {
+    console.log('📊 Cap nhat cam bien:', duLieu);
+    capNhatGiaoDien(duLieu);
 });
 
-socket.on('status_update', (data) => {
-    console.log('📢 Status:', data);
-    showAlert('info', 'Status Update', data.status);
+ket_noi.on('status_update', (duLieu) => {
+    console.log('📢 Trang thai:', duLieu);
+    hienThiThongBao('info', 'Cập nhật trạng thái', duLieu.trang_thai);
 });
 
-// Initialize
+// Khởi tạo
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Initializing dashboard...');
-    initCharts();
+    console.log('🚀 Dang khoi tao bang dieu khien...');
+    khoiTaoBieuDo();
     
-    loadThingSpeakData();
+    taiDuLieuThingSpeak();
     
     fetch('/api/data')
-        .then(response => response.json())
-        .then(data => {
-            console.log('📥 Initial data:', data);
-            updateUI(data);
+        .then(phanHoi => phanHoi.json())
+        .then(duLieu => {
+            console.log('📥 Du lieu ban dau:', duLieu);
+            capNhatGiaoDien(duLieu);
         })
-        .catch(error => console.error('Error:', error));
+        .catch(loi => console.error('Loi:', loi));
     
-    setInterval(loadThingSpeakData, 5 * 60 * 1000);
+    // Tải lại dữ liệu ThingSpeak mỗi 5 phút
+    setInterval(taiDuLieuThingSpeak, 5 * 60 * 1000);
 });
