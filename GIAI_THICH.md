@@ -1,724 +1,1472 @@
-# 📖 GIẢI THÍCH CHI TIẾT CÁC TÍNH NĂNG
+# 📚 GIẢI THÍCH CHI TIẾT DỰ ÁN IOT V5.1
 
-## 🎯 TỔNG QUAN HỆ THỐNG
-
-Hệ thống giám sát môi trường thông minh giúp:
-- **Đo đạc**: Tự động đo nhiệt độ, độ ẩm, ánh sáng, khí gas
-- **Cảnh báo**: Báo động khi môi trường không an toàn
-- **Tự động hóa**: Tự động bật quạt khi nóng, bật đèn khi tối
-- **Giám sát từ xa**: Xem dữ liệu trên điện thoại/máy tính qua Internet
+## 📋 Mục lục
+1. [Tổng quan kiến trúc](#1-tổng-quan-kiến-trúc)
+2. [Phân tích code ESP32](#2-phân-tích-code-esp32)
+3. [Phân tích Web Dashboard](#3-phân-tích-web-dashboard)
+4. [Phân tích Telegram Bot](#4-phân-tích-telegram-bot)
+5. [Giao thức MQTT](#5-giao-thức-mqtt)
+6. [ThingSpeak Cloud](#6-thingspeak-cloud)
+7. [Công thức tính toán](#7-công-thức-tính-toán)
+8. [Thuật toán điều khiển](#8-thuật-toán-điều-khiển)
+9. [Test Mode vs Real Mode](#9-test-mode-vs-real-mode)
+10. [Xử lý lỗi và tối ưu](#10-xử-lý-lỗi-và-tối-ưu)
 
 ---
 
-## 📡 PHẦN 1: CẢM BIẾN (Đo đạc)
+## 1. Tổng quan kiến trúc
 
-### 1. DHT22 - Cảm biến nhiệt độ & độ ẩm
+### 1.1. Mô hình 3 lớp
 
-**Là gì?**
-- Đo nhiệt độ không khí (°C)
-- Đo độ ẩm không khí (%)
-
-**Tại sao cần?**
-- Nhiệt độ quá cao/thấp → Không thoải mái, ảnh hưởng sức khỏe
-- Độ ẩm quá cao → Mốc, vi khuẩn phát triển
-- Độ ẩm quá thấp → Khô da, khó thở
-
-**Ứng dụng thực tế:**
-- Phòng ngủ: 20-24°C, 50-60% RH
-- Phòng máy chủ: 18-27°C, 45-55% RH
-- Nhà kính trồng rau: 25-30°C, 60-80% RH
-
-**Trong code:**
-```cpp
-temperature = dht.readTemperature();  // Đọc nhiệt độ
-humidity = dht.readHumidity();        // Đọc độ ẩm
+```
+┌────────────────────────────────────────────┐
+│         LỚP 1: THU THẬP DỮ LIỆU           │
+│                                            │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐│
+│  │  DHT22   │  │   LDR    │  │   MQ-2   ││
+│  │ (T & H)  │  │  (Light) │  │  (Gas)   ││
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘│
+│       │             │             │       │
+│       └─────────────┼─────────────┘       │
+│                     │                     │
+│              ┌──────▼──────┐              │
+│              │    ESP32    │              │
+│              │ (Xử lý dữ  │              │
+│              │  liệu)      │              │
+│              └──────┬──────┘              │
+└─────────────────────┼──────────────────────┘
+                      │
+┌─────────────────────▼──────────────────────┐
+│         LỚP 2: TRUYỀN THÔNG IOT           │
+│                                            │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐│
+│  │   MQTT   │  │ThingSpeak│  │WebSocket ││
+│  │ (Real-   │  │  (Lưu    │  │ (Real-   ││
+│  │  time)   │  │  trữ)    │  │  time)   ││
+│  └──────────┘  └──────────┘  └──────────┘│
+└─────────────────────┬──────────────────────┘
+                      │
+┌─────────────────────▼──────────────────────┐
+│      LỚP 3: GIAO DIỆN NGƯỜI DÙNG          │
+│                                            │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐│
+│  │   Web    │  │ Telegram │  │   LCD    ││
+│  │Dashboard │  │   Bot    │  │ 16x2     ││
+│  └──────────┘  └──────────┘  └──────────┘│
+└────────────────────────────────────────────┘
 ```
 
----
+### 1.2. Luồng dữ liệu
 
-### 2. LDR - Cảm biến ánh sáng
-
-**Là gì?**
-- Light Dependent Resistor (điện trở phụ thuộc ánh sáng)
-- Đo cường độ ánh sáng (0-1000 lux)
-
-**Tại sao cần?**
-- Ánh sáng yếu → Mỏi mắt khi làm việc/học
-- Ánh sáng quá mạnh → Chói mắt, tốn điện
-
-**Ứng dụng thực tế:**
-- Tự động bật đèn khi trời tối
-- Điều chỉnh độ sáng màn hình điện thoại
-- Đèn đường tự động sáng vào ban đêm
-
-**Trong code:**
-```cpp
-int ldrValue = analogRead(LDR_PIN);
-lightLevel = map(ldrValue, 0, 4095, 0, 1000);
+```
+[Sensors] → [ESP32] → [MQTT Broker] → [Web/Bot]
+                 ↓
+            [ThingSpeak]
 ```
 
-**Giá trị tham khảo:**
-- 0-200: Tối (cần đèn)
-- 200-500: Ánh sáng yếu
-- 500-800: Đủ sáng
-- 800-1000: Rất sáng
+**Chu kỳ hoạt động:**
+- Đọc cảm biến: **2 giây**
+- Gửi MQTT: **5 giây**
+- Gửi ThingSpeak: **20 giây**
+- Cập nhật LCD: **3 giây** (mỗi trang)
 
 ---
 
-### 3. MQ-2 - Cảm biến khí gas
+## 2. Phân tích code ESP32
 
-**Là gì?**
-- Phát hiện khí gas dễ cháy (LPG, propane, methane)
-- Đo nồng độ khí (0-1000 ppm)
+### 2.1. Cấu trúc chính
 
-**Tại sao cần?**
-- Gas rò rỉ → Nguy hiểm cháy nổ, ngộ độc
-- Phát hiện sớm → Cảnh báo kịp thời
-
-**Ứng dụng thực tế:**
-- Nhà bếp: Phát hiện gas rò rỉ từ bếp
-- Nhà máy: Giám sát khu vực nguy hiểm
-- Hầm xe: Phát hiện khí CO từ xe
-
-**Trong code:**
 ```cpp
-int mq2Value = analogRead(MQ2_PIN);
-gasLevel = map(mq2Value, 0, 4095, 0, 1000);
-```
+// ===== KHỞI TẠO =====
+void setup() {
+  // 1. Khởi tạo Serial, Pins
+  // 2. Kết nối WiFi
+  // 3. Khởi tạo MQTT, ThingSpeak
+  // 4. Khởi tạo LCD, DHT
+}
 
-**Ngưỡng nguy hiểm:**
-- < 400: An toàn
-- 400-600: Cảnh báo
-- > 600: Nguy hiểm!
-
----
-
-## 🎛️ PHẦN 2: THIẾT BỊ ĐIỀU KHIỂN (Actuators)
-
-### 1. LED (Đèn chỉ thị)
-
-**3 màu LED:**
-
-🟢 **LED Xanh (Green)** - D25
-- Sáng: Mọi thứ bình thường
-- Tắt: Có vấn đề
-
-🔴 **LED Đỏ (Red)** - D26
-- Sáng: Cảnh báo (nhiệt độ, độ ẩm, gas vượt ngưỡng)
-- Tắt: An toàn
-
-🔵 **LED Xanh dương (Blue)** - D14
-- Sáng: Đang kết nối WiFi
-- Tắt: Đã kết nối xong
-
-**Trong code:**
-```cpp
-digitalWrite(LED_GREEN, HIGH);  // Bật LED xanh
-digitalWrite(LED_RED, HIGH);    // Bật LED đỏ
-```
-
----
-
-### 2. Buzzer (Còi cảnh báo)
-
-**Là gì?**
-- Loa nhỏ phát ra tiếng beep
-
-**Khi nào kêu?**
-- Nhiệt độ > 35°C hoặc < 15°C
-- Độ ẩm > 80% hoặc < 30%
-- Ánh sáng < 300 lux
-- Khí gas > 400 ppm
-
-**Trong code:**
-```cpp
-tone(BUZZER_PIN, 1000, 200);  // Kêu 1000Hz trong 200ms
-```
-
----
-
-### 3. Relay (Công tắc điện tử)
-
-**Relay là gì?**
-- Công tắc điều khiển bằng tín hiệu điện
-- ESP32 gửi tín hiệu → Relay bật/tắt thiết bị điện
-
-**Relay 1 - Quạt (Fan) - D33**
-
-*Tự động (Auto Mode):*
-- Nhiệt độ > 30°C → Tự động BẬT quạt
-- Nhiệt độ ≤ 28°C → Tự động TẮT quạt
-
-*Thủ công (Manual Mode):*
-- Điều khiển bằng MQTT: `FAN_ON` / `FAN_OFF`
-
-**Relay 2 - Đèn (Light) - D32**
-
-*Tự động (Auto Mode):*
-- Ánh sáng < 300 lux → Tự động BẬT đèn
-- Ánh sáng ≥ 500 lux → Tự động TẮT đèn
-
-*Thủ công (Manual Mode):*
-- Điều khiển bằng MQTT: `LIGHT_ON` / `LIGHT_OFF`
-
-**Trong code:**
-```cpp
-// Ví dụ: Tự động bật quạt
-if (temperature > 30.0 && !fanStatus) {
-    fanStatus = true;
-    digitalWrite(RELAY_FAN, HIGH);  // Bật quạt
-    Serial.println("Quat: BAT");
+// ===== VÒNG LẶP =====
+void loop() {
+  // 1. Kiểm tra kết nối MQTT
+  // 2. Đọc cảm biến (mỗi 2s)
+  // 3. Cập nhật LCD (mỗi 3s)
+  // 4. Gửi ThingSpeak (mỗi 20s)
+  // 5. Gửi MQTT (mỗi 5s)
 }
 ```
 
----
+### 2.2. Đọc cảm biến DHT22
 
-### 4. Button (Nút bấm MODE)
-
-**Chức năng:**
-- Chuyển đổi giữa 2 chế độ:
-  - **AUTO**: Hệ thống tự động điều khiển quạt, đèn
-  - **MANUAL**: Bạn điều khiển bằng MQTT
-
-**Cách dùng:**
-- Nhấn 1 lần → Chuyển AUTO ↔ MANUAL
-- LCD sẽ hiển thị chế độ hiện tại
-
-**Trong code:**
 ```cpp
-if (buttonState == LOW && lastButtonState == HIGH) {
-    autoMode = !autoMode;  // Đảo ngược chế độ
+void readSensors() {
+  // Đọc nhiệt độ và độ ẩm
+  temperature = dht.readTemperature();
+  humidity = dht.readHumidity();
+  
+  // Kiểm tra lỗi
+  if (isnan(temperature) || isnan(humidity)) {
+    Serial.println("⚠ Loi DHT22!");
+    temperature = 25.0;  // Giá trị mặc định
+    humidity = 60.0;
+  }
 }
 ```
 
----
+**Tại sao cần kiểm tra `isnan()`?**
+- DHT22 đôi khi trả về `NaN` (Not a Number) khi đọc lỗi
+- Phải thay bằng giá trị mặc định để hệ thống không crash
 
-## 📊 PHẦN 3: CHỈ SỐ TÍNH TOÁN
+### 2.3. Test Mode vs Real Mode
 
-### 1. Heat Index (Chỉ số nhiệt)
+```cpp
+#define TEST_MODE true  // Đổi thành false để dùng cảm biến thật
 
-**Là gì?**
-- Nhiệt độ "cảm nhận được" khi có độ ẩm
-- Ví dụ: 30°C + độ ẩm 80% = cảm giác như 35°C
+void readSensors() {
+  if (TEST_MODE) {
+    // Chế độ TEST: Giá trị ngẫu nhiên
+    lightLux = random(0, 1001);        // 0-1000 Lux
+    gasPPM = random(0, 501);           // 0-500 PPM
+  } else {
+    // Chế độ THẬT: Đọc từ cảm biến
+    lightLevel = analogRead(LDR_PIN); // 0-4095
+    gasLevel = analogRead(MQ2_PIN);   // 0-4095
+    
+    // Chuyển đổi sang đơn vị thực
+    lightLux = map(lightLevel, 0, 4095, 0, 1000);
+    gasPPM = map(gasLevel, 0, 4095, 0, 1000);
+  }
+}
+```
 
-**Tại sao cần?**
-- Độ ẩm cao làm mồ hôi khó bay hơi
-- Cơ thể khó tản nhiệt → Cảm giác nóng hơn
+**Mục đích của Test Mode:**
+- ✅ Kiểm tra logic điều khiển mà không cần phần cứng
+- ✅ Dễ dàng mô phỏng các tình huống cực hạn
+- ✅ Debug nhanh hơn trên Wokwi
+
+### 2.4. Tính Heat Index (Chỉ số nhiệt)
+
+```cpp
+// Công thức NOAA Heat Index
+float c1 = -8.78469475556;
+float c2 = 1.61139411;
+float c3 = 2.33854883889;
+// ... các hệ số khác
+
+heatIndex = c1 + c2*T + c3*H + c4*T*H + 
+            c5*T*T + c6*H*H + c7*T*T*H + 
+            c8*T*H*H + c9*T*T*H*H;
+```
+
+**Heat Index là gì?**
+- Nhiệt độ "cảm giác như" con người cảm nhận được
+- Kết hợp nhiệt độ và độ ẩm
+- Ví dụ: 30°C + 80% độ ẩm = cảm giác như 35°C
 
 **Công thức:**
 ```
-HI = c1 + c2*T + c3*RH + c4*T*RH + c5*T² + c6*RH² + ...
+HI = c1 + c2*T + c3*RH + c4*T*RH + c5*T² + 
+     c6*RH² + c7*T²*RH + c8*T*RH² + c9*T²*RH²
 ```
-(Công thức phức tạp của NOAA - Cơ quan Khí tượng Mỹ)
+Trong đó:
+- `T` = nhiệt độ (°C)
+- `RH` = độ ẩm (%)
 
-**Ví dụ:**
-- Nhiệt độ 32°C, độ ẩm 60% → Heat Index = 35.6°C
-- Nhiệt độ 32°C, độ ẩm 90% → Heat Index = 42.1°C (nguy hiểm!)
+### 2.5. Tính Comfort Index (Chỉ số thoải mái)
 
----
-
-### 2. Comfort Index (Chỉ số thoải mái)
-
-**Là gì?**
-- Đánh giá tổng thể môi trường có thoải mái không (0-100 điểm)
-- Tính dựa trên: Nhiệt độ, độ ẩm, ánh sáng, khí gas
-
-**Cách tính:**
-```
-Điểm nhiệt độ = 100 - |24 - nhiệt độ| × 5
-  → Nhiệt độ lý tưởng: 24°C
-  → 24°C = 100 điểm
-  → 20°C hoặc 28°C = 80 điểm
-
-Điểm độ ẩm = 100 - |60 - độ ẩm| × 2
-  → Độ ẩm lý tưởng: 60%
-  → 60% = 100 điểm
-  → 50% hoặc 70% = 80 điểm
-
-Điểm ánh sáng = ánh sáng / 10
-  → 500 lux = 50 điểm
-  → 800 lux = 80 điểm
-
-Điểm gas = 100 - gas / 10
-  → 0 ppm = 100 điểm
-  → 400 ppm = 60 điểm
-
-Comfort Index = Trung bình 4 điểm trên
-```
-
-**Đánh giá:**
-- 80-100: Tuyệt vời (Excellent) 😊
-- 60-79: Tốt (Good) 🙂
-- 40-59: Chấp nhận được (Fair) 😐
-- 0-39: Kém (Poor) ☹️
-
-**Ví dụ:**
-```
-Phòng A: T=24°C, RH=60%, L=700, G=100
-→ CI = (100 + 100 + 70 + 90) / 4 = 90 → Tuyệt vời!
-
-Phòng B: T=35°C, RH=90%, L=200, G=500
-→ CI = (45 + 40 + 20 + 50) / 4 = 39 → Kém!
-```
-
----
-
-## 🌐 PHẦN 4: KẾT NỐI IoT
-
-### 1. WiFi
-
-**Chức năng:**
-- Kết nối ESP32 vào mạng Internet
-- Trong Wokwi: Tự động kết nối với "Wokwi-GUEST"
-
-**Trong code:**
 ```cpp
-WiFi.begin(ssid, password);
-// Đợi kết nối...
-if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("WiFi ket noi thanh cong!");
+// Điểm từng yếu tố (0-100)
+float tempScore = max(0.0f, 100.0f - abs(24.0f - temperature) * 5);
+float humidScore = max(0.0f, 100.0f - abs(60.0f - humidity) * 2);
+float lightScore = min(100.0f, (lightLux / 10.0f));
+float gasScore = max(0.0f, 100.0f - (gasPPM / 10.0f));
+
+// Trung bình 4 yếu tố
+comfortIndex = (tempScore + humidScore + lightScore + gasScore) / 4;
+```
+
+**Giải thích:**
+
+1. **tempScore**: Nhiệt độ lý tưởng = 24°C
+   - Cách 24°C mỗi 1 độ → trừ 5 điểm
+   - Ví dụ: 28°C → `100 - |24-28|*5 = 80 điểm`
+
+2. **humidScore**: Độ ẩm lý tưởng = 60%
+   - Cách 60% mỗi 1% → trừ 2 điểm
+   - Ví dụ: 70% → `100 - |60-70|*2 = 80 điểm`
+
+3. **lightScore**: Ánh sáng càng cao càng tốt
+   - 1000 Lux = 100 điểm
+   - Ví dụ: 500 Lux → `500/10 = 50 điểm`
+
+4. **gasScore**: Khí gas càng thấp càng tốt
+   - 0 PPM = 100 điểm
+   - Ví dụ: 200 PPM → `100 - 200/10 = 80 điểm`
+
+**Đánh giá Comfort Index:**
+- 80-100: 😊 Tuyệt vời
+- 60-80: 🙂 Tốt
+- 0-60: 😟 Kém
+
+### 2.6. Điều khiển quạt tự động (Hysteresis)
+
+```cpp
+void autoFanControl() {
+  if (temperature >= TEMP_FAN_ON && !fanStatus) {
+    // Bật quạt khi T >= 30°C VÀ quạt đang TẮT
+    fanStatus = true;
+    digitalWrite(RELAY_FAN, HIGH);
+  }
+  else if (temperature <= TEMP_FAN_OFF && fanStatus) {
+    // Tắt quạt khi T <= 28°C VÀ quạt đang BẬT
+    fanStatus = false;
+    digitalWrite(RELAY_FAN, LOW);
+  }
+}
+```
+
+**Tại sao không dùng ngưỡng đơn giản?**
+
+❌ **Cách SAI:**
+```cpp
+if (temperature > 30) {
+  fanOn();
+} else {
+  fanOff();
+}
+```
+**Vấn đề:** Nếu T dao động quanh 30°C (29.9, 30.1, 29.8...)
+→ Quạt sẽ bật/tắt liên tục → hỏng relay!
+
+✅ **Cách ĐÚNG (Hysteresis):**
+```
+Nhiệt độ tăng: 28 → 29 → 30 → BẬT quạt
+Nhiệt độ giảm: 30 → 29 → 28 → TẮT quạt
+```
+→ Vùng 28-30°C là "vùng trễ" (hysteresis zone)
+
+**Biểu đồ:**
+```
+Temp (°C)
+  ^
+35│                  [Quạt BẬT]
+30├─────────────────────┐
+  │  [Hysteresis Zone] │
+28├────────────────────┘
+  │     [Quạt TẮT]
+15│
+  └─────────────────────> Time
+```
+
+### 2.7. Gửi dữ liệu MQTT
+
+```cpp
+void sendMQTT() {
+  // Tạo JSON payload
+  String payload = "{";
+  payload += "\"temp\":" + String(temperature, 1) + ",";
+  payload += "\"humid\":" + String(humidity, 1) + ",";
+  payload += "\"light_lux\":" + String(lightLux, 1) + ",";
+  payload += "\"gas_ppm\":" + String(gasPPM, 1) + ",";
+  payload += "\"heat_index\":" + String(heatIndex, 1) + ",";
+  payload += "\"comfort\":" + String(comfortIndex) + ",";
+  payload += "\"fan\":" + String(fanStatus ? "true" : "false") + ",";
+  payload += "\"alert\":" + String(systemAlert ? "true" : "false");
+  payload += "}";
+  
+  // Publish
+  mqtt.publish(mqtt_topic_data, payload.c_str());
+}
+```
+
+**Ví dụ payload:**
+```json
+{
+  "temp": 28.5,
+  "humid": 65.2,
+  "light_lux": 450.0,
+  "gas_ppm": 120.5,
+  "heat_index": 30.2,
+  "comfort": 75,
+  "fan": "true",
+  "alert": "false"
+}
+```
+
+### 2.8. Gửi dữ liệu ThingSpeak
+
+```cpp
+void sendThingSpeak() {
+  ThingSpeak.setField(1, temperature);      // Field 1
+  ThingSpeak.setField(2, humidity);         // Field 2
+  ThingSpeak.setField(3, lightLux);         // Field 3
+  ThingSpeak.setField(4, gasPPM);           // Field 4
+  ThingSpeak.setField(5, fanStatus ? 1:0);  // Field 5
+  ThingSpeak.setField(6, heatIndex);        // Field 6
+  ThingSpeak.setField(7, comfortIndex);     // Field 7
+  ThingSpeak.setField(8, systemAlert ? 1:0);// Field 8
+  
+  int status = ThingSpeak.writeFields(channelID, writeAPIKey);
+}
+```
+
+**Giới hạn ThingSpeak:**
+- ⏱️ Tối thiểu 15 giây giữa 2 lần gửi
+- 📊 Tối đa 8 fields mỗi channel
+- 🆓 Free account: 3 triệu messages/năm
+
+### 2.9. Cập nhật LCD (5 trang)
+
+```cpp
+void updateLCD() {
+  if (lcdPage == 0) {
+    // Trang 1: Nhiệt độ & Độ ẩm
+    lcd.print("T:25.5°C TOT");
+    lcd.print("H:65.0% TOT");
+  }
+  else if (lcdPage == 1) {
+    // Trang 2: Ánh sáng
+    lcd.print("Sang:450 Lux");
+    lcd.print("Trang thai: TOT");
+  }
+  // ... các trang khác
+}
+```
+
+**Vì sao cần nhiều trang?**
+- LCD 16x2 chỉ có 32 ký tự
+- Không đủ hiển thị tất cả thông tin cùng lúc
+- Giải pháp: Luân phiên mỗi 3 giây
+
+---
+
+## 3. Phân tích Web Dashboard
+
+### 3.1. Kiến trúc Flask + SocketIO
+
+```python
+# Backend (app.py)
+app = Flask(__name__)
+socketio = SocketIO(app)
+
+# MQTT callback
+def on_message(client, userdata, msg):
+    data = json.loads(msg.payload)
+    socketio.emit('sensor_update', data)  # Real-time
+
+# Route
+@app.route('/')
+def index():
+    return render_template('index.html')
+```
+
+**Luồng dữ liệu:**
+```
+[ESP32] → MQTT → [Flask] → SocketIO → [Browser]
+                    ↓
+              [ThingSpeak]
+```
+
+### 3.2. Frontend Real-time (app.js)
+
+```javascript
+// Kết nối Socket.IO
+const socket = io();
+
+// Nhận dữ liệu real-time
+socket.on('sensor_update', (data) => {
+  updateUI(data);      // Cập nhật số liệu
+  updateCharts(data);  // Cập nhật biểu đồ
+});
+```
+
+**Tại sao dùng SocketIO thay vì HTTP polling?**
+
+❌ **HTTP Polling (cũ):**
+```javascript
+setInterval(() => {
+  fetch('/api/data')  // Gửi request liên tục
+    .then(res => res.json())
+    .then(data => update(data));
+}, 1000);  // Mỗi giây
+```
+**Nhược điểm:**
+- Tốn băng thông (gửi request liên tục)
+- Độ trễ cao (phải đợi đến chu kỳ tiếp theo)
+
+✅ **SocketIO (mới):**
+```javascript
+socket.on('sensor_update', (data) => {
+  update(data);  // Nhận ngay khi có dữ liệu mới
+});
+```
+**Ưu điểm:**
+- Real-time thực sự (< 100ms)
+- Tiết kiệm băng thông (chỉ gửi khi có thay đổi)
+
+### 3.3. Biểu đồ Chart.js
+
+```javascript
+function updateCharts(data) {
+  // Giới hạn 20 điểm
+  if (tempChart.data.labels.length >= maxDataPoints) {
+    tempChart.data.labels.shift();      // Xóa điểm cũ
+    tempChart.data.datasets[0].data.shift();
+  }
+  
+  // Thêm điểm mới
+  tempChart.data.labels.push(time);
+  tempChart.data.datasets[0].data.push(data.temp);
+  
+  // Cập nhật biểu đồ (không animation)
+  tempChart.update('none');
+}
+```
+
+**Tại sao `update('none')`?**
+- `update()` mặc định có animation → chậm
+- `update('none')` → không animation → mượt hơn
+
+### 3.4. Tải dữ liệu lịch sử ThingSpeak
+
+```javascript
+async function loadThingSpeakData() {
+  const response = await fetch('/api/thingspeak');
+  const data = await response.json();
+  
+  data.feeds.forEach(feed => {
+    tempChart.data.labels.push(timestamp);
+    tempChart.data.datasets[0].data.push(feed.field1);
+  });
+}
+```
+
+**Khi nào gọi?**
+1. Khi trang web load (`DOMContentLoaded`)
+2. Mỗi 5 phút (để cập nhật dữ liệu cũ)
+
+---
+
+## 4. Phân tích Telegram Bot
+
+### 4.1. Cấu trúc Bot
+
+```python
+bot = telebot.TeleBot(TELEGRAM_TOKEN)
+
+# Xử lý lệnh
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    bot.send_message(message.chat.id, welcome_text)
+
+# Nhận dữ liệu từ MQTT
+def on_message(client, userdata, msg):
+    data = json.loads(msg.payload)
+    check_alerts(data)  # Kiểm tra cảnh báo
+```
+
+### 4.2. Gửi dữ liệu tự động
+
+```python
+def auto_send_data():
+    while True:
+        time.sleep(AUTO_SEND_INTERVAL)  # 30 giây
+        
+        for user_id in auto_data_users:
+            bot.send_message(user_id, data_text)
+```
+
+**Cơ chế hoạt động:**
+1. User gửi `/auto_on` → thêm vào `auto_data_users`
+2. Thread riêng chạy vòng lặp gửi dữ liệu
+3. User gửi `/auto_off` → xóa khỏi set
+
+### 4.3. Hệ thống cảnh báo thông minh
+
+```python
+def check_alerts(data):
+    global alert_sent
+    
+    if data['temp'] > 35:
+        if not alert_sent.get('temp_high'):
+            send_alert("Nhiệt độ quá cao!")
+            alert_sent['temp_high'] = True
+    else:
+        alert_sent['temp_high'] = False  # Reset flag
+```
+
+**Tại sao cần `alert_sent`?**
+
+❌ **Không dùng flag:**
+```python
+if data['temp'] > 35:
+    send_alert("Nóng!")  # Gửi liên tục!
+```
+**Vấn đề:** Nếu T = 36°C liên tục → gửi alert mỗi 5 giây!
+
+✅ **Dùng flag:**
+```python
+if data['temp'] > 35 and not alert_sent:
+    send_alert("Nóng!")
+    alert_sent = True  # Chỉ gửi 1 lần
+```
+**Khi nào reset flag?**
+- Khi T trở về bình thường (< 35°C)
+
+### 4.4. Xử lý lỗi bot
+
+```python
+try:
+    bot.send_message(user_id, text)
+except Exception as e:
+    if "bot was blocked" in str(e).lower():
+        auto_data_users.discard(user_id)  # Xóa user đã chặn bot
+```
+
+**Các lỗi thường gặp:**
+- User chặn bot → `Forbidden: bot was blocked`
+- User xóa chat → `Bad Request: chat not found`
+
+---
+
+## 5. Giao thức MQTT
+
+### 5.1. Publish/Subscribe Pattern
+
+```
+┌─────────┐                    ┌─────────┐
+│  ESP32  │──── publish ───────>│ Broker │
+│(Publisher)                    │         │
+└─────────┘                    └────┬────┘
+                                    │
+                         ┌──────────┴──────────┐
+                         │subscribe            │subscribe
+                         ▼                     ▼
+                    ┌─────────┐          ┌─────────┐
+                    │   Web   │          │   Bot   │
+                    │(Subscriber)        │(Subscriber)
+                    └─────────┘          └─────────┘
+```
+
+### 5.2. Topics
+
+```
+iot/env/data      → Dữ liệu cảm biến (JSON)
+iot/env/status    → Trạng thái hệ thống (text)
+```
+
+**QoS Levels:**
+- QoS 0: At most once (mặc định) → nhanh nhưng có thể mất
+- QoS 1: At least once → chắc chắn nhận nhưng có thể trùng
+- QoS 2: Exactly once → chậm nhưng chính xác
+
+**Dự án này dùng QoS 0** vì:
+- Dữ liệu cảm biến gửi liên tục
+- Mất 1 gói không ảnh hưởng lớn
+
+### 5.3. Retained Messages
+
+```python
+mqtt.publish(topic, payload, retain=True)
+```
+
+**Công dụng:**
+- Subscriber mới kết nối → nhận ngay message cuối cùng
+- Không cần đợi ESP32 gửi lần kế tiếp
+
+---
+
+## 6. ThingSpeak Cloud
+
+### 6.1. Channel Structure
+
+```
+Channel ID: 3123035
+
+Field 1: Temperature (°C)
+Field 2: Humidity (%)
+Field 3: Light (Lux)
+Field 4: Gas (PPM)
+Field 5: Fan Status (0/1)
+Field 6: Heat Index (°C)
+Field 7: Comfort Index (0-100)
+Field 8: Alert Status (0/1)
+```
+
+### 6.2. REST API
+
+**Write (ESP32 → ThingSpeak):**
+```
+POST https://api.thingspeak.com/update
+Headers: api_key=YOUR_WRITE_KEY
+Body: field1=28.5&field2=65.0&...
+```
+
+**Read (Web → ThingSpeak):**
+```
+GET https://api.thingspeak.com/channels/3123035/feeds.json
+Params: results=20&api_key=YOUR_READ_KEY
+```
+
+### 6.3. Visualization
+
+ThingSpeak tự động tạo biểu đồ cho mỗi field:
+- Line charts
+- Bar charts
+- Export CSV/JSON
+
+---
+
+## 7. Công thức tính toán
+
+### 7.1. Chuyển đổi ADC → Lux (LDR)
+
+```cpp
+// Đọc ADC (0-4095)
+int rawValue = analogRead(LDR_PIN);
+
+// Đảo ngược (tối → 4095, sáng → 0)
+int inverted = 4095 - rawValue;
+
+// Map sang Lux (0-1000)
+lightLux = map(inverted, 0, 4095, 0, 1000);
+```
+
+**Vì sao cần đảo ngược?**
+- LDR: điện trở giảm khi sáng → ADC tăng
+- Nhưng ta muốn: sáng → Lux cao
+- Giải pháp: đảo `4095 - raw`
+
+### 7.2. Chuyển đổi ADC → PPM (MQ-2)
+
+```cpp
+int rawValue = analogRead(MQ2_PIN);
+gasPPM = map(rawValue, 0, 4095, 0, 1000);
+```
+
+**Lưu ý:**
+- Đây là mapping tuyến tính đơn giản
+- MQ-2 thật cần calibration phức tạp hơn
+- Xem datasheet MQ-2 để hiểu rõ
+
+### 7.3. Heat Index Formula (NOAA)
+
+```
+HI = -8.78469 + 1.61139T + 2.33854RH - 0.14611TRH 
+     - 0.01231T² - 0.01642RH² + 0.00222T²RH 
+     + 0.00073TRH² - 0.0000036T²RH²
+```
+
+Trong đó:
+- T = Temperature (°C)
+- RH = Relative Humidity (%)
+
+**Nguồn:** National Weather Service (NOAA)
+
+---
+
+## 8. Thuật toán điều khiển
+
+### 8.1. State Machine cho Quạt
+
+```
+┌─────────┐   T >= 30°C   ┌─────────┐
+│  OFF    │──────────────>│   ON    │
+│         │<──────────────│         │
+└─────────┘   T <= 28°C   └─────────┘
+```
+
+**Code:**
+```cpp
+enum FanState { OFF, ON };
+FanState fanState = OFF;
+
+void updateFan() {
+  switch(fanState) {
+    case OFF:
+      if (temp >= 30) fanState = ON;
+      break;
+    case ON:
+      if (temp <= 28) fanState = OFF;
+      break;
+  }
+}
+```
+
+### 8.2. Priority System cho Cảnh báo
+
+```
+1. Gas > 300 PPM     → Nguy hiểm! (Ưu tiên cao nhất)
+2. Temp > 35°C       → Rất nóng
+3. Temp < 15°C       → Rất lạnh
+4. Humidity > 80%    → Ẩm quá
+5. Light < 200 Lux   → Tối
+```
+
+**Code:**
+```cpp
+if (gas > 300) {
+  alert = "NGUY HIỂM: KHÍ GAS!";
+  priority = 1;
+} else if (temp > 35) {
+  alert = "CẢNH BÁO: QUÁ NÓNG";
+  priority = 2;
+}
+// ...
+```
+
+---
+
+## 9. Test Mode vs Real Mode
+
+### 9.1. So sánh
+
+| Tính năng | Test Mode | Real Mode |
+|-----------|-----------|-----------|
+| Nhiệt độ | DHT22 thật | DHT22 thật |
+| Độ ẩm | DHT22 thật | DHT22 thật |
+| Ánh sáng | Random 0-1000 | Đọc LDR |
+| Khí gas | Random 0-500 | Đọc MQ-2 |
+| Mục đích | Debug logic | Sản xuất |
+
+### 9.2. Khi nào dùng Test Mode?
+
+✅ **Dùng khi:**
+- Kiểm tra logic điều khiển quạt
+- Mô phỏng tình huống nguy hiểm (gas cao, nhiệt độ cực đoan)
+- Debug trên Wokwi (cảm biến ảo không chính xác)
+- Demo cho khách hàng
+- Kiểm tra threshold (ngưỡng cảnh báo)
+
+❌ **Không dùng khi:**
+- Triển khai hệ thống thật
+- Cần dữ liệu chính xác để phân tích
+- Kiểm tra độ chính xác của cảm biến
+
+### 9.3. Chuyển đổi giữa 2 chế độ
+
+```cpp
+// Trong main.cpp
+#define TEST_MODE true  // Đổi thành false
+
+// Khởi động sẽ hiển thị:
+if (TEST_MODE) {
+  Serial.println("CHE DO: THU NGHIEM (Gia tri ngau nhien)");
+  lcd.print("CHE DO THU");
+} else {
+  Serial.println("CHE DO: THAT (Gia tri cam bien)");
+  lcd.print("CHE DO THAT");
 }
 ```
 
 ---
 
-### 2. ThingSpeak (Cloud IoT Platform)
+## 10. Xử lý lỗi và tối ưu
 
-**ThingSpeak là gì?**
-- Website miễn phí lưu trữ dữ liệu IoT
-- Tự động tạo biểu đồ, theo dõi từ xa
-
-**Hoạt động như thế nào?**
-1. ESP32 đo cảm biến → Có dữ liệu
-2. ESP32 gửi dữ liệu lên ThingSpeak (qua WiFi)
-3. ThingSpeak lưu trữ và vẽ biểu đồ
-4. Bạn mở website ThingSpeak → Xem biểu đồ
-
-**Trong code:**
-```cpp
-ThingSpeak.setField(1, temperature);    // Field 1: Nhiệt độ
-ThingSpeak.setField(2, humidity);       // Field 2: Độ ẩm
-ThingSpeak.setField(3, lightLevel);     // Field 3: Ánh sáng
-// ... (8 fields total)
-
-int status = ThingSpeak.writeFields(channelID, writeAPIKey);
-// status = 200 → Thành công!
-```
-
-**Tần suất gửi:**
-- Mỗi 20 giây gửi 1 lần
-- ThingSpeak miễn phí giới hạn: tối thiểu 15 giây/lần
-
-**8 Fields trong ThingSpeak:**
-1. Temperature (Nhiệt độ)
-2. Humidity (Độ ẩm)
-3. Light Level (Ánh sáng)
-4. Gas Level (Khí gas)
-5. Fan Status (Quạt: 0=Tắt, 1=Bật)
-6. Light Status (Đèn: 0=Tắt, 1=Bật)
-7. Heat Index (Chỉ số nhiệt)
-8. Comfort Index (Chỉ số thoải mái)
-
----
-
-### 3. MQTT (Message Queue Telemetry Transport)
-
-**MQTT là gì?**
-- Giao thức truyền tin IoT nhanh, nhẹ
-- Hoạt động theo mô hình Publish/Subscribe
-
-**Giải thích đơn giản:**
-- **Broker**: Máy chủ trung gian (test.mosquitto.org)
-- **Publisher**: Thiết bị gửi tin (ESP32)
-- **Subscriber**: Thiết bị/App nhận tin (điện thoại của bạn)
-- **Topic**: Kênh truyền tin (giống như kênh TV)
-
-**Ví dụ thực tế:**
-```
-ESP32 → Publish vào topic "iot/env/data"
-      → Tin nhắn: {"temp":28.5, "humid":65, ...}
-
-Điện thoại → Subscribe topic "iot/env/data"
-           → Nhận được tin: {"temp":28.5, "humid":65, ...}
-           → Hiển thị lên app
-```
-
-**3 Topics trong dự án:**
-
-1. **iot/env/data** (ESP32 → App)
-   - ESP32 gửi dữ liệu mỗi 5 giây
-   - Format: JSON
-   ```json
-   {
-     "temp": 28.5,
-     "humid": 65.3,
-     "light": 750,
-     "gas": 250,
-     "fan": true,
-     "light_relay": false
-   }
-   ```
-
-2. **iot/env/control** (App → ESP32)
-   - App gửi lệnh điều khiển
-   - Commands:
-     - `FAN_ON` → Bật quạt
-     - `FAN_OFF` → Tắt quạt
-     - `LIGHT_ON` → Bật đèn
-     - `LIGHT_OFF` → Tắt đèn
-     - `AUTO_MODE` → Chế độ tự động
-     - `MANUAL_MODE` → Chế độ thủ công
-
-3. **iot/env/status** (ESP32 → App)
-   - ESP32 báo trạng thái hệ thống
-   - Ví dụ: "online", "fan_auto_on", "alert"
-
-**Tại sao dùng MQTT thay vì ThingSpeak?**
-- MQTT: Real-time (tức thì), 2 chiều
-- ThingSpeak: Chậm hơn (20s), 1 chiều
-
----
-
-## 🖥️ PHẦN 5: LCD (Màn hình hiển thị)
-
-**LCD 20x4:**
-- 20 ký tự × 4 dòng
-- Hiển thị thông tin trực tiếp trên thiết bị
-
-**Tự động chuyển 3 trang (mỗi 5 giây):**
-
-### Trang 1: Dữ liệu cảm biến
-```
-T:28.5C H:65%
-L:750 G:250
-HI:29.2 CI:85
-STATUS: EXCELLENT
-```
-
-### Trang 2: Trạng thái thiết bị
-```
-=== DEVICES ===
-Fan:   ON  (Auto)
-Light: OFF (Auto)
-Mode: AUTOMATIC
-```
-
-### Trang 3: Thống kê
-```
-=== STATISTICS ===
-Data Count: 125
-Avg T: 28.3C
-Avg H: 64.8%
-```
-
----
-
-## 🔄 PHẦN 6: HAI CHẾ ĐỘ HOẠT ĐỘNG
-
-### CHẾ ĐỘ 1: AUTO (Tự động)
-
-**Đặc điểm:**
-- Hệ thống tự quyết định
-- Không cần can thiệp
-
-**Quy tắc:**
-
-1. **Quạt:**
-   - Nhiệt độ > 30°C → Tự động BẬT
-   - Nhiệt độ ≤ 28°C → Tự động TẮT
-   - *Lý do có 2°C chênh lệch: Tránh bật tắt liên tục*
-
-2. **Đèn:**
-   - Ánh sáng < 300 lux → Tự động BẬT
-   - Ánh sáng ≥ 500 lux → Tự động TẮT
-
-**Ưu điểm:**
-- Tiện lợi, không cần thao tác
-- Tiết kiệm điện (bật đúng lúc cần)
-
-**Nhược điểm:**
-- Không linh hoạt theo ý muốn cá nhân
-
----
-
-### CHẾ ĐỘ 2: MANUAL (Thủ công)
-
-**Đặc điểm:**
-- Bạn điều khiển mọi thứ
-- Dùng MQTT để gửi lệnh
-
-**Cách điều khiển:**
-1. Cài MQTT Client (MQTT Explorer, MQTTX)
-2. Kết nối: `test.mosquitto.org:1883`
-3. Publish vào topic `iot/env/control`:
-   - `FAN_ON` → Bật quạt
-   - `FAN_OFF` → Tắt quạt
-   - `LIGHT_ON` → Bật đèn
-   - `LIGHT_OFF` → Tắt đèn
-
-**Ưu điểm:**
-- Linh hoạt, điều khiển từ xa
-- Theo ý muốn cá nhân
-
-**Nhược điểm:**
-- Phải thao tác thủ công
-- Có thể quên tắt → Lãng phí điện
-
----
-
-### Chuyển đổi giữa 2 chế độ:
-
-**Cách 1: Nhấn nút MODE** (trên Wokwi)
-- Click button → Chuyển AUTO ↔ MANUAL
-
-**Cách 2: Qua MQTT**
-- Publish `AUTO_MODE` hoặc `MANUAL_MODE`
-
----
-
-## 📈 PHẦN 7: THỐNG KÊ
-
-**Hệ thống tự động ghi nhận:**
-- Số lần đo: `dataCount`
-- Tổng nhiệt độ: `tempSum`
-- Tổng độ ẩm: `humidSum`
-
-**Tính trung bình:**
-```cpp
-float avgTemp = tempSum / dataCount;
-float avgHumid = humidSum / dataCount;
-```
-
-**Ứng dụng:**
-- Biết nhiệt độ trung bình trong ngày
-- So sánh giữa các ngày
-- Phát hiện xu hướng (ngày càng nóng, càng ẩm...)
-
-**Reset thống kê:**
-- Gửi MQTT: `RESET_STATS`
-
----
-
-## 🎯 TÓM TẮT QUY TRÌNH HOẠT ĐỘNG
-
-```
-BẮT ĐẦU
-  ↓
-1. Khởi động ESP32
-   → Kết nối WiFi
-   → Kết nối MQTT Broker
-   ↓
-2. Đọc cảm biến (mỗi 2 giây)
-   → DHT22: Nhiệt độ, Độ ẩm
-   → LDR: Ánh sáng
-   → MQ-2: Khí gas
-   ↓
-3. Tính toán
-   → Heat Index
-   → Comfort Index
-   ↓
-4. Kiểm tra cảnh báo
-   → Có vượt ngưỡng? → BẬT LED đỏ + Buzzer
-   → An toàn? → BẬT LED xanh
-   ↓
-5. Chế độ AUTO?
-   → Có: Tự động điều khiển Quạt/Đèn
-   → Không: Chờ lệnh MQTT
-   ↓
-6. Hiển thị
-   → LCD: Chuyển 3 trang
-   → Serial Monitor: In dữ liệu
-   ↓
-7. Gửi IoT
-   → ThingSpeak: Mỗi 20 giây
-   → MQTT: Mỗi 5 giây
-   ↓
-8. Lặp lại từ bước 2
-```
-
----
-
-## 💡 CÂU HỎI THƯỜNG GẶP
-
-### Q1: Tại sao cần Heat Index khi đã có nhiệt độ?
-
-**A:** Nhiệt độ không nói lên tất cả! 
-
-Ví dụ:
-- Phòng A: 30°C, độ ẩm 40% → Cảm giác khô ráo, chịu được
-- Phòng B: 30°C, độ ẩm 80% → Cảm giác ngột ngạt, rất khó chịu
-
-Heat Index = Nhiệt độ "thực sự cảm nhận được" khi có độ ẩm.
-
----
-
-### Q2: Comfort Index khác Heat Index thế nào?
-
-**A:**
-- **Heat Index**: Chỉ tính nhiệt độ + độ ẩm
-- **Comfort Index**: Tính tổng thể (nhiệt độ + độ ẩm + ánh sáng + gas)
-
-Comfort Index toàn diện hơn, đánh giá môi trường tổng thể.
-
----
-
-### Q3: Tại sao Quạt bật ở 30°C nhưng tắt ở 28°C?
-
-**A:** Để tránh hiện tượng "dao động" (oscillation).
-
-Nếu bật/tắt cùng 1 ngưỡng (ví dụ 29°C):
-- 29.1°C → Bật quạt
-- Quạt thổi → 28.9°C → Tắt quạt
-- Tắt quạt → Nóng lại 29.1°C → Bật quạt
-- → Bật tắt liên tục!
-
-Có 2°C chênh lệch (hysteresis) → Ổn định hơn.
-
----
-
-### Q4: MQTT và ThingSpeak, dùng cái nào?
-
-**A:** Dùng CẢ HAI, mỗi cái có ưu điểm riêng:
-
-**ThingSpeak:**
-- Lưu trữ lâu dài (vài tháng)
-- Vẽ biểu đồ đẹp
-- Dễ phân tích xu hướng
-- Nhưng chậm (20 giây)
-
-**MQTT:**
-- Real-time (5 giây)
-- Điều khiển 2 chiều
-- Nhanh, tức thì
-- Nhưng không lưu trữ
-
----
-
-### Q5: Làm sao biết hệ thống đang ở chế độ nào?
-
-**A:** Có 3 cách:
-1. Xem LCD - Trang 2: Dòng cuối "Mode: AUTOMATIC" hoặc "MANUAL"
-2. Xem Serial Monitor: In ra "Che do: TU DONG" hoặc "THU CONG"
-3. Subscribe MQTT topic `iot/env/status`: Nhận "auto_mode" hoặc "manual_mode"
-
----
-
-### Q6: Tại sao có 3 LED thay vì 1?
-
-**A:** Mỗi LED có nhiệm vụ riêng:
-
-🔵 **LED Blue (Xanh dương)**
-- Chỉ sáng 1 lần khi khởi động
-- Đang kết nối WiFi
-- Tắt = Đã kết nối xong
-
-💚 **LED Green (Xanh lá)**
-- Trạng thái bình thường
-- Sáng = Mọi thứ OK
-- Tắt = Có vấn đề
-
-🔴 **LED Red (Đỏ)**
-- Cảnh báo
-- Sáng = Có thông số vượt ngưỡng
-- Tắt = An toàn
-
-Nhìn LED biết ngay trạng thái, không cần xem màn hình!
-
----
-
-### Q7: Tôi có thể thay đổi ngưỡng cảnh báo không?
-
-**A:** Có! Sửa trong code (dòng 42-47):
+### 10.1. Xử lý mất kết nối WiFi
 
 ```cpp
-const float TEMP_MAX = 35.0;      // ← Thay số này
-const float TEMP_MIN = 15.0;      // ← Thay số này
-const float HUMID_MAX = 80.0;     // ← Thay số này
-const float HUMID_MIN = 30.0;     // ← Thay số này
-const int LIGHT_MIN = 500;        // ← Thay số này
-const int GAS_THRESHOLD = 400;    // ← Thay số này
+void loop() {
+  // Kiểm tra WiFi mỗi vòng lặp
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("⚠️ Mat ket noi WiFi!");
+    digitalWrite(LED_RED, HIGH);
+    
+    // Thử kết nối lại
+    WiFi.reconnect();
+    delay(5000);
+    return;  // Skip phần còn lại
+  }
+}
 ```
 
-Ví dụ bạn muốn cảnh báo nhiệt độ > 32°C:
+**Tại sao không dừng hẳn?**
+- Hệ thống vẫn hoạt động local (LCD, LED, quạt)
+- Chỉ mất khả năng gửi dữ liệu IoT
+
+### 10.2. Xử lý MQTT disconnect
+
 ```cpp
-const float TEMP_MAX = 32.0;  // Thay 35 thành 32
+void loop() {
+  if (!mqtt.connected()) {
+    connectMQTT();  // Kết nối lại
+  } else {
+    mqtt.loop();    // Xử lý message
+  }
+}
+
+void connectMQTT() {
+  while (!mqtt.connected()) {
+    if (mqtt.connect(clientId.c_str())) {
+      Serial.println("✓ MQTT ket noi thanh cong");
+      mqtt.subscribe(MQTT_TOPIC);
+    } else {
+      Serial.println("✗ Loi MQTT, thu lai sau 5s");
+      delay(5000);
+    }
+  }
+}
 ```
 
-Sau đó build lại: `pio run`
+**Exponential Backoff (nâng cao):**
+```cpp
+int retryDelay = 1000;  // Bắt đầu 1 giây
+
+while (!mqtt.connected()) {
+  if (!mqtt.connect(...)) {
+    delay(retryDelay);
+    retryDelay *= 2;  // Tăng gấp đôi: 1s → 2s → 4s → 8s
+    if (retryDelay > 60000) retryDelay = 60000;  // Max 60s
+  }
+}
+```
+
+### 10.3. Tối ưu bộ nhớ ESP32
+
+```cpp
+// ❌ SAI: Tạo String mới liên tục
+void sendMQTT() {
+  String payload = "";
+  payload += "\"temp\":";
+  payload += String(temperature);  // Tạo String tạm → tốn RAM
+}
+
+// ✅ ĐÚNG: Dùng buffer cố định
+void sendMQTT() {
+  char buffer[256];
+  snprintf(buffer, sizeof(buffer), 
+           "{\"temp\":%.1f,\"humid\":%.1f}", 
+           temperature, humidity);
+  mqtt.publish(topic, buffer);
+}
+```
+
+**Giải thích:**
+- ESP32 có 320KB RAM nhưng heap fragmentation là vấn đề
+- String concatenation (`+=`) tạo nhiều đối tượng tạm
+- `snprintf()` ghi trực tiếp vào buffer → tiết kiệm RAM
+
+### 10.4. Watchdog Timer (nâng cao)
+
+```cpp
+#include <esp_task_wdt.h>
+
+void setup() {
+  // Kích hoạt watchdog 30 giây
+  esp_task_wdt_init(30, true);
+  esp_task_wdt_add(NULL);
+}
+
+void loop() {
+  // Reset watchdog mỗi vòng lặp
+  esp_task_wdt_reset();
+  
+  // Code của bạn...
+}
+```
+
+**Mục đích:**
+- Nếu loop() bị treo > 30s → ESP32 tự reset
+- Tránh hệ thống "đơ" vĩnh viễn
+
+### 10.5. Non-blocking Code
+
+```cpp
+// ❌ SAI: Blocking
+void loop() {
+  readSensors();
+  delay(2000);  // Chặn 2 giây!
+  sendMQTT();
+}
+
+// ✅ ĐÚNG: Non-blocking
+unsigned long lastRead = 0;
+
+void loop() {
+  if (millis() - lastRead >= 2000) {
+    readSensors();
+    lastRead = millis();
+  }
+  
+  // Code khác vẫn chạy được
+  checkButton();
+  updateLCD();
+}
+```
+
+**Tại sao quan trọng?**
+- `delay()` chặn toàn bộ chương trình
+- `millis()` cho phép multitasking đơn giản
+
+### 10.6. Lọc nhiễu cảm biến (Moving Average)
+
+```cpp
+#define SAMPLES 5
+float tempHistory[SAMPLES] = {0};
+int index = 0;
+
+float getFilteredTemp() {
+  float raw = dht.readTemperature();
+  
+  // Lưu vào history
+  tempHistory[index] = raw;
+  index = (index + 1) % SAMPLES;
+  
+  // Tính trung bình
+  float sum = 0;
+  for (int i = 0; i < SAMPLES; i++) {
+    sum += tempHistory[i];
+  }
+  return sum / SAMPLES;
+}
+```
+
+**Kết quả:**
+- Dữ liệu mượt hơn
+- Giảm nhiễu tức thời
+- Nhưng chậm hơn (độ trễ = SAMPLES * thời gian đọc)
 
 ---
 
-## 🎯 KẾT LUẬN
+## 11. Security (Bảo mật)
 
-### Hệ thống này giải quyết vấn đề gì?
+### 11.1. Vấn đề bảo mật hiện tại
 
-**Vấn đề 1: Giám sát môi trường thủ công tốn thời gian**
-→ Giải pháp: Tự động đo, hiển thị 24/7
+❌ **Các lỗ hổng:**
+1. **MQTT không mã hóa** → Ai cũng có thể nghe lén
+2. **API Keys trong code** → Dễ bị đánh cắp
+3. **Không xác thực** → Ai cũng publish được lên topic
 
-**Vấn đề 2: Không biết khi nào môi trường nguy hiểm**
-→ Giải pháp: Cảnh báo ngay khi vượt ngưỡng
+### 11.2. Giải pháp cơ bản
 
-**Vấn đề 3: Quên bật quạt/đèn**
-→ Giải pháp: Tự động hóa thông minh
+```cpp
+// 1. Dùng MQTT over TLS (port 8883)
+const int mqtt_port = 8883;
 
-**Vấn đề 4: Không theo dõi được khi đi xa**
-→ Giải pháp: IoT Cloud (ThingSpeak + MQTT)
+// 2. Dùng username/password
+mqtt.setServer(mqtt_server, mqtt_port);
+mqtt.connect(clientId, mqtt_user, mqtt_pass);
 
----
+// 3. Lưu secrets trong file riêng
+#include "secrets.h"  // Không commit lên Git
+```
 
-### Ứng dụng thực tế
+**secrets.h:**
+```cpp
+#define WIFI_SSID "your-wifi"
+#define WIFI_PASS "your-password"
+#define MQTT_USER "your-username"
+#define MQTT_PASS "your-password"
+#define TS_API_KEY "your-api-key"
+```
 
-1. **Nhà thông minh**
-   - Tự động điều hòa nhiệt độ
-   - Tiết kiệm điện
+**.gitignore:**
+```
+secrets.h
+*.secret
+```
 
-2. **Nhà kính trồng rau**
-   - Giám sát điều kiện cây trồng
-   - Tăng năng suất
+### 11.3. Rate Limiting
 
-3. **Phòng máy chủ**
-   - Cảnh báo nhiệt độ cao → Tránh hỏng máy
-   - Phát hiện gas/khói → Phòng cháy
+```python
+# Trong Flask app
+from flask_limiter import Limiter
 
-4. **Phòng bảo quản**
-   - Dược phẩm, thực phẩm cần nhiệt độ ổn định
-   - Ghi log để kiểm tra
+limiter = Limiter(app, key_func=get_remote_address)
 
-5. **Phòng lab**
-   - Môi trường ảnh hưởng kết quả thí nghiệm
-   - Cần giám sát chính xác
+@app.route('/api/data')
+@limiter.limit("10 per minute")  # Giới hạn 10 request/phút
+def get_data():
+    return jsonify(latest_data)
+```
 
----
-
-### Điểm mạnh của dự án
-
-✅ **Đầy đủ tính năng IoT**: Cảm biến + Cloud + Tự động hóa  
-✅ **Thông minh**: Tự động học và điều chỉnh  
-✅ **Linh hoạt**: Auto + Manual mode  
-✅ **Dễ mở rộng**: Thêm cảm biến/thiết bị dễ dàng  
-✅ **Tiết kiệm**: Không tốn chi phí vận hành  
-✅ **Giáo dục**: Học được nhiều công nghệ IoT  
-
----
-
-## 📚 TÀI LIỆU THAM KHẢO
-
-### Về cảm biến
-- DHT22 Datasheet: https://www.sparkfun.com/datasheets/Sensors/Temperature/DHT22.pdf
-- MQ-2 Datasheet: https://www.pololu.com/file/0J309/MQ2.pdf
-
-### Về giao thức
-- MQTT Protocol: https://mqtt.org/
-- I2C Communication: https://www.nxp.com/docs/en/user-guide/UM10204.pdf
-
-### Về IoT Platform
-- ThingSpeak Documentation: https://www.mathworks.com/help/thingspeak/
-- MQTT Broker: http://test.mosquitto.org/
-
-### Về tính toán
-- Heat Index Formula (NOAA): https://www.weather.gov/ama/heatindex
-- Indoor Air Quality Standards: https://www.epa.gov/indoor-air-quality-iaq
+**Tại sao cần?**
+- Ngăn chặn DDoS
+- Tiết kiệm tài nguyên server
 
 ---
 
-**Hy vọng giải thích này giúp bạn hiểu rõ hơn về hệ thống! 🎓**
+## 12. Testing & Debugging
+
+### 12.1. Unit Test cho tính toán
+
+```python
+# test_calculations.py
+def test_comfort_index():
+    # Test case 1: Điều kiện lý tưởng
+    temp = 24
+    humid = 60
+    light = 1000
+    gas = 0
+    
+    comfort = calculate_comfort(temp, humid, light, gas)
+    assert comfort == 100
+    
+    # Test case 2: Điều kiện xấu
+    temp = 40
+    humid = 90
+    light = 0
+    gas = 500
+    
+    comfort = calculate_comfort(temp, humid, light, gas)
+    assert comfort < 30
+```
+
+### 12.2. Serial Monitor Debugging
+
+```cpp
+// Thêm macro debug
+#define DEBUG 1
+
+#if DEBUG
+  #define DEBUG_PRINT(x) Serial.print(x)
+  #define DEBUG_PRINTLN(x) Serial.println(x)
+#else
+  #define DEBUG_PRINT(x)
+  #define DEBUG_PRINTLN(x)
+#endif
+
+// Sử dụng
+DEBUG_PRINTLN("Bat dau doc cam bien");
+DEBUG_PRINT("Temp: ");
+DEBUG_PRINTLN(temperature);
+```
+
+**Lợi ích:**
+- Khi release: Đặt `DEBUG 0` → tắt hết debug → tiết kiệm RAM
+
+### 12.3. Web Debug Console
+
+```javascript
+// Trong app.js
+socket.on('sensor_update', (data) => {
+  console.log('📊 Received:', data);  // Xem trong Browser Console
+  
+  // Validate data
+  if (!data.temp || !data.humid) {
+    console.error('❌ Invalid data:', data);
+    return;
+  }
+  
+  updateUI(data);
+});
+```
+
+### 12.4. MQTT Monitor Tool
+
+```bash
+# Cài đặt mosquitto_sub
+sudo apt-get install mosquitto-clients
+
+# Lắng nghe tất cả messages
+mosquitto_sub -h test.mosquitto.org -t "iot/env/#" -v
+
+# Output:
+# iot/env/data {"temp":28.5,"humid":65.0,...}
+# iot/env/status quat_bat_tu_dong
+```
+
+---
+
+## 13. Deployment (Triển khai)
+
+### 13.1. Chuẩn bị Production
+
+**Checklist:**
+- [ ] Đổi TEST_MODE = false
+- [ ] Cập nhật WiFi credentials
+- [ ] Thay đổi MQTT topic (tránh xung đột)
+- [ ] Sử dụng broker riêng (không dùng test.mosquitto.org)
+- [ ] Thêm error handling đầy đủ
+- [ ] Test tất cả tính năng
+- [ ] Backup database ThingSpeak
+
+### 13.2. Hosting Web Dashboard
+
+**Option 1: VPS (Ubuntu)**
+```bash
+# Cài đặt dependencies
+sudo apt-get update
+sudo apt-get install python3 python3-pip
+
+# Clone project
+git clone https://github.com/your/repo.git
+cd repo/web-dashboard
+
+# Cài đặt packages
+pip3 install -r requirements.txt
+
+# Chạy với gunicorn (production)
+pip3 install gunicorn
+gunicorn --worker-class eventlet -w 1 -b 0.0.0.0:5000 app:app
+```
+
+**Option 2: Heroku**
+```bash
+# Tạo Procfile
+echo "web: gunicorn --worker-class eventlet -w 1 app:app" > Procfile
+
+# Deploy
+heroku create
+git push heroku main
+```
+
+**Option 3: Docker**
+```dockerfile
+# Dockerfile
+FROM python:3.9
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
+CMD ["gunicorn", "--worker-class", "eventlet", "-w", "1", "-b", "0.0.0.0:5000", "app:app"]
+```
+
+### 13.3. Chạy Telegram Bot 24/7
+
+```bash
+# Sử dụng screen
+screen -S telegram-bot
+cd telegram-bot
+python3 bot.py
+# Nhấn Ctrl+A+D để detach
+
+# Kiểm tra lại
+screen -r telegram-bot
+```
+
+**Hoặc dùng systemd service:**
+```ini
+# /etc/systemd/system/telegram-bot.service
+[Unit]
+Description=IoT Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/telegram-bot
+ExecStart=/usr/bin/python3 /home/ubuntu/telegram-bot/bot.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl enable telegram-bot
+sudo systemctl start telegram-bot
+sudo systemctl status telegram-bot
+```
+
+---
+
+## 14. Monitoring & Logging
+
+### 14.1. Log vào file
+
+```python
+# Trong app.py
+import logging
+
+logging.basicConfig(
+    filename='iot_system.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+def on_message(client, userdata, msg):
+    logging.info(f"Received: {msg.payload}")
+```
+
+### 14.2. Uptime Monitoring
+
+```python
+import time
+
+start_time = time.time()
+
+@app.route('/api/status')
+def get_status():
+    uptime = time.time() - start_time
+    return jsonify({
+        'uptime_seconds': uptime,
+        'mqtt_connected': mqtt_client.is_connected(),
+        'latest_data_age': time.time() - latest_data['timestamp']
+    })
+```
+
+### 14.3. Health Check
+
+```python
+@app.route('/health')
+def health():
+    checks = {
+        'mqtt': mqtt_client.is_connected(),
+        'database': test_db_connection(),
+        'thingspeak': test_thingspeak_api()
+    }
+    
+    if all(checks.values()):
+        return jsonify({'status': 'healthy', 'checks': checks}), 200
+    else:
+        return jsonify({'status': 'unhealthy', 'checks': checks}), 503
+```
+
+---
+
+## 15. Nâng cấp tương lai
+
+### 15.1. Machine Learning
+
+```python
+# Dự đoán nhiệt độ tiếp theo
+from sklearn.linear_model import LinearRegression
+
+model = LinearRegression()
+X = [[t1, h1], [t2, h2], ...]  # Lịch sử
+y = [t_next1, t_next2, ...]     # Nhiệt độ tiếp theo
+
+model.fit(X, y)
+
+# Dự đoán
+prediction = model.predict([[current_temp, current_humid]])
+```
+
+### 15.2. Database (thay ThingSpeak)
+
+```python
+from sqlalchemy import create_engine, Column, Float, DateTime
+from sqlalchemy.orm import sessionmaker
+
+# Model
+class SensorData(Base):
+    __tablename__ = 'sensor_data'
+    id = Column(Integer, primary_key=True)
+    timestamp = Column(DateTime)
+    temperature = Column(Float)
+    humidity = Column(Float)
+    # ...
+
+# Lưu dữ liệu
+session.add(SensorData(
+    timestamp=datetime.now(),
+    temperature=data['temp'],
+    humidity=data['humid']
+))
+session.commit()
+```
+
+### 15.3. Mobile App (React Native)
+
+```javascript
+// Kết nối MQTT trong mobile app
+import mqtt from 'react-native-mqtt';
+
+const client = mqtt.connect('mqtt://broker.com');
+
+client.on('message', (topic, message) => {
+  const data = JSON.parse(message);
+  updateState(data);
+});
+```
+
+### 15.4. Voice Control (Alexa/Google Home)
+
+```python
+# Flask-Ask cho Alexa
+from flask_ask import Ask, statement
+
+ask = Ask(app, '/')
+
+@ask.intent('TemperatureIntent')
+def get_temperature():
+    temp = latest_data['temp']
+    return statement(f"Nhiệt độ hiện tại là {temp} độ C")
+```
+
+---
+
+## 16. Troubleshooting (Xử lý sự cố)
+
+### 16.1. ESP32 không boot
+
+**Triệu chứng:** Serial Monitor chỉ hiển thị ký tự lạ
+
+**Nguyên nhân:**
+- Baud rate sai
+- Nút BOOT chưa nhả
+- Nguồn không đủ
+
+**Giải pháp:**
+1. Đổi baud rate: 115200
+2. Nhấn nút RESET
+3. Dùng nguồn 5V/2A
+
+### 16.2. Dữ liệu không hiển thị trên Web
+
+**Debug steps:**
+```bash
+# 1. Kiểm tra ESP32 đã gửi MQTT chưa?
+mosquitto_sub -h test.mosquitto.org -t "iot/env/#"
+
+# 2. Kiểm tra Flask nhận được chưa?
+# → Xem terminal Flask log
+
+# 3. Kiểm tra Browser nhận được chưa?
+# → F12 → Console → Network → WS (WebSocket)
+```
+
+### 16.3. ThingSpeak lỗi 400
+
+**Nguyên nhân:**
+- Write API Key sai
+- Gửi quá nhanh (< 15s)
+- Field không hợp lệ
+
+**Giải pháp:**
+```cpp
+// Tăng interval
+const unsigned long THINGSPEAK_INTERVAL = 20000;  // 20s
+
+// Kiểm tra response
+int status = ThingSpeak.writeFields(...);
+if (status == 200) {
+  Serial.println("OK");
+} else {
+  Serial.print("Error: ");
+  Serial.println(status);
+}
+```
+
+---
+
+## 17. Best Practices
+
+### 17.1. Code Organization
+
+```
+esp32/
+├── src/
+│   ├── main.cpp          # Main logic
+│   ├── sensors.h         # Sensor functions
+│   ├── mqtt.h            # MQTT functions
+│   ├── display.h         # LCD functions
+│   └── config.h          # Configuration
+```
+
+### 17.2. Naming Conventions
+
+```cpp
+// Constants: UPPER_CASE
+const int LED_PIN = 25;
+const float TEMP_MAX = 35.0;
+
+// Variables: camelCase
+float currentTemperature;
+bool fanStatus;
+
+// Functions: camelCase
+void readSensors();
+void updateDisplay();
+
+// Classes: PascalCase
+class SensorManager { };
+```
+
+### 17.3. Comments
+
+```cpp
+// ❌ SAI: Comment rõ ràng
+temperature = dht.readTemperature();  // Đọc nhiệt độ
+
+// ✅ ĐÚNG: Comment WHY, không phải WHAT
+// Đọc DHT22 trước LDR để tránh xung đột I2C
+temperature = dht.readTemperature();
+delay(10);  // DHT22 cần 10ms recovery time
+lightLevel = analogRead(LDR_PIN);
+```
+
+---
+
+## 18. Kết luận
+
+### 18.1. Kiến thức đã học
+
+Qua dự án này, bạn đã làm quen với:
+
+**Hardware:**
+- Đọc cảm biến analog/digital
+- I2C communication (LCD)
+- GPIO control (LED, Relay, Buzzer)
+
+**Embedded:**
+- ESP32 Arduino programming
+- Non-blocking code với millis()
+- Hysteresis control
+- Watchdog timer
+
+**IoT:**
+- MQTT publish/subscribe
+- ThingSpeak REST API
+- Real-time WebSocket
+- JSON data format
+
+**Web Development:**
+- Flask backend
+- SocketIO real-time
+- Chart.js visualization
+- Responsive CSS
+
+**Bot Development:**
+- Telegram Bot API
+- Threading trong Python
+- Alert system với flags
+
+### 18.2. Điểm mạnh của hệ thống
+
+✅ **Modular:** Mỗi phần có thể hoạt động độc lập
+✅ **Scalable:** Dễ thêm cảm biến hoặc actuator
+✅ **Real-time:** Cập nhật dữ liệu nhanh (< 1s)
+✅ **Multi-interface:** Web, Telegram, LCD
+✅ **Smart control:** Quạt tự động với hysteresis
+✅ **Test-friendly:** Test mode cho debugging
+
+### 18.3. Cải tiến tiếp theo
+
+Bạn có thể:
+- [ ] Thêm database để lưu dữ liệu dài hạn
+- [ ] Tạo mobile app
+- [ ] Thêm ML để dự đoán
+- [ ] Implement OTA (Over-The-Air) updates
+- [ ] Tạo dashboard tùy chỉnh cho từng user
+- [ ] Thêm authentication & authorization
+- [ ] Deploy lên cloud (AWS/Azure/GCP)
+
+---
+
+## 19. Tài nguyên học thêm
+
+### 19.1. Documentation
+- **ESP32:** https://docs.espressif.com
+- **MQTT:** https://mqtt.org
+- **ThingSpeak:** https://thingspeak.com/docs
+- **Flask-SocketIO:** https://flask-socketio.readthedocs.io
+- **pyTelegramBotAPI:** https://pytba.readthedocs.io
+
+### 19.2. Books
+- "Getting Started with ESP32" - Kolban
+- "Programming with MicroPython" - Nicholas Tollervey
+- "Building the Web of Things" - Guinard & Trifa
+
+### 19.3. Courses
+- Udemy: ESP32 IoT Projects
+- Coursera: Internet of Things Specialization
+- edX: Introduction to IoT
+
+---
+
+**🎉 Chúc mừng bạn đã hoàn thành dự án IoT toàn diện! 🎉**
+
+Hy vọng file giải thích này giúp bạn hiểu sâu về từng phần của hệ thống. Nếu có thắc mắc, hãy tham khảo thêm các tài liệu được đề xuất hoặc thử nghiệm trực tiếp trên code!
+
+**Happy Coding! 🚀**
