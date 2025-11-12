@@ -310,3 +310,372 @@ header h1 {
         grid-template-columns: 1fr;
     }
 }
+/* Thêm vào cuối file style.css hiện tại */
+
+/* Thêm vào cuối file style.css hiện tại */
+
+/* ===== AI PANEL ===== */
+.ai-panel {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    margin-bottom: 30px;
+    border: 3px solid #8b5cf6;
+    position: relative;
+    overflow: hidden;
+}
+
+.ai-panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, #8b5cf6, #7c3aed, #6d28d9);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.ai-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.ai-header h2 {
+    color: #8b5cf6;
+    margin: 0;
+    font-size: 1.8em;
+}
+
+.ai-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-ai {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-ai:hover {
+    transform: scale(1.05);
+    box-shadow: 0 5px 15px rgba(139, 92, 246, 0.4);
+}
+
+.btn-ai:active {
+    transform: scale(0.95);
+}
+
+.btn-ai:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-settings {
+    background: #6b7280;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-settings:hover {
+    background: #4b5563;
+}
+
+.ai-content {
+    min-height: 200px;
+    padding: 20px;
+    background: #f9fafb;
+    border-radius: 10px;
+    position: relative;
+}
+
+.ai-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: #9ca3af;
+}
+
+.ai-placeholder .ai-icon {
+    font-size: 4em;
+    margin-bottom: 15px;
+}
+
+.ai-placeholder p {
+    font-size: 1.1em;
+    text-align: center;
+}
+
+.ai-analysis {
+    line-height: 1.8;
+    color: #374151;
+}
+
+.ai-analysis h3 {
+    color: #8b5cf6;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    font-size: 1.2em;
+    padding: 10px;
+    background: #f3f4f6;
+    border-radius: 8px;
+}
+
+.ai-analysis h3.warning {
+    color: #ef4444;
+    background: #fee2e2;
+}
+
+.ai-analysis h3.advice {
+    color: #10b981;
+    background: #d1fae5;
+}
+
+.ai-analysis p {
+    margin-bottom: 15px;
+}
+
+.ai-analysis ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 10px 0;
+}
+
+.ai-analysis li {
+    padding: 8px 12px;
+    margin: 5px 0;
+    background: #f9fafb;
+    border-left: 4px solid #8b5cf6;
+    border-radius: 4px;
+}
+
+.ai-analysis li:hover {
+    background: #f3f4f6;
+    transform: translateX(5px);
+    transition: all 0.2s;
+}
+
+.ai-analysis strong {
+    color: #1f2937;
+}
+
+.ai-analysis .metric {
+    color: #8b5cf6;
+    font-weight: bold;
+    background: #ede9fe;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.analysis-content {
+    margin: 20px 0;
+}
+
+.data-snapshot {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f9fafb;
+    border-radius: 10px;
+    border: 2px dashed #e5e7eb;
+}
+
+.data-snapshot h4 {
+    color: #6b7280;
+    margin-bottom: 10px;
+    font-size: 1em;
+}
+
+.snapshot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+}
+
+.snapshot-grid span {
+    padding: 8px 12px;
+    background: white;
+    border-radius: 6px;
+    text-align: center;
+    font-weight: bold;
+    color: #374151;
+    border: 1px solid #e5e7eb;
+}
+
+.ai-priority {
+    display: inline-block;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.ai-priority.low {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.ai-priority.medium {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.ai-priority.high {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.ai-priority.critical {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.ai-timestamp {
+    text-align: right;
+    color: #6b7280;
+    font-size: 0.9em;
+    margin-top: 15px;
+    font-style: italic;
+}
+
+.ai-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+}
+
+.ai-loading .spinner {
+    border: 4px solid #f3f4f6;
+    border-top: 4px solid #8b5cf6;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ===== MODAL ===== */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 10% auto;
+    padding: 30px;
+    border-radius: 15px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content h2 {
+    color: #8b5cf6;
+    margin-bottom: 20px;
+}
+
+.close {
+    color: #9ca3af;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.3s;
+}
+
+.close:hover {
+    color: #4b5563;
+}
+
+.setting-group {
+    margin-bottom: 20px;
+}
+
+.setting-group label {
+    display: block;
+    color: #374151;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.setting-group input[type="checkbox"] {
+    margin-right: 10px;
+    transform: scale(1.3);
+}
+
+.setting-group input[type="number"] {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1em;
+    transition: border-color 0.3s;
+}
+
+.setting-group input[type="number"]:focus {
+    outline: none;
+    border-color: #8b5cf6;
+}
+
+.setting-group small {
+    display: block;
+    color: #6b7280;
+    margin-top: 5px;
+    font-size: 0.85em;
+}
+
+/* Responsive cho AI Panel */
+@media (max-width: 768px) {
+    .ai-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .ai-controls {
+        width: 100%;
+        flex-direction: column;
+    }
+    
+    .btn-ai, .btn-settings {
+        width: 100%;
+    }
+    
+    .modal-content {
+        margin: 20% auto;
+        width: 95%;
+    }
+}

@@ -5,6 +5,7 @@ import json
 import threading
 import time
 from datetime import datetime
+from gemini_config import analyze_environment, get_short_summary, format_for_telegram, ANALYSIS_INTERVAL
 
 # ===== CẤU HÌNH =====
 TELEGRAM_TOKEN = "8494895987:AAHC0g2pnAHnjx-vw9JY1aqNhkT5J2qI1FA"
@@ -31,10 +32,16 @@ latest_data = {
     'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 }
 
+latest_analysis = None  # Lưu phân tích mới nhất từ Gemini
+
 # Danh sách users
 subscribed_users = set()
 auto_data_users = set()
+ai_analysis_users = set()  # Users nhận phân tích AI
 alert_sent = {}
+
+# Cấu hình thời gian phân tích AI cho từng user
+user_ai_intervals = {}  # {user_id: interval_in_seconds}
 
 # ===== MQTT CALLBACKS =====
 def on_connect(client, userdata, flags, rc):
@@ -67,6 +74,59 @@ def start_mqtt():
         mqtt_client.loop_forever()
     except Exception as e:
         print(f"✗ Loi MQTT: {e}")
+
+# ===== PHÂN TÍCH AI TỰ ĐỘNG =====
+def auto_ai_analysis():
+    """Gửi phân tích AI định kỳ cho users đã đăng ký"""
+    print(f"✓ Da bat phan tich AI tu dong")
+    
+    last_analysis_time = {}  # Theo dõi thời gian phân tích cuối cho mỗi user
+    
+    while True:
+        try:
+            time.sleep(10)  # Kiểm tra mỗi 10 giây
+            
+            current_time = time.time()
+            
+            for user_id in list(ai_analysis_users):
+                # Lấy interval của user (mặc định 30 phút)
+                interval = user_ai_intervals.get(user_id, ANALYSIS_INTERVAL)
+                
+                # Kiểm tra đã đến lúc phân tích chưa
+                last_time = last_analysis_time.get(user_id, 0)
+                if current_time - last_time >= interval:
+                    try:
+                        print(f"🤖 Dang phan tich AI cho user {user_id}...")
+                        
+                        # Phân tích bằng Gemini
+                        result = analyze_environment(latest_data)
+                        
+                        if result['success']:
+                            global latest_analysis
+                            latest_analysis = result
+                            
+                            # Format message đẹp cho Telegram
+                            message = format_for_telegram(result)
+                            
+                            bot.send_message(user_id, message, parse_mode='HTML')
+                            print(f"✓ Da gui phan tich AI den {user_id}")
+                            
+                            # Cập nhật thời gian
+                            last_analysis_time[user_id] = current_time
+                            
+                        else:
+                            error_msg = f"❌ Lỗi phân tích AI: {result['error']}"
+                            bot.send_message(user_id, error_msg)
+                            
+                    except Exception as e:
+                        print(f"✗ Loi gui AI den {user_id}: {e}")
+                        if "bot was blocked" in str(e).lower():
+                            ai_analysis_users.discard(user_id)
+                            if user_id in user_ai_intervals:
+                                del user_ai_intervals[user_id]
+                                
+        except Exception as e:
+            print(f"✗ Loi phan tich AI tu dong: {e}")
 
 # ===== GỬI DỮ LIỆU TỰ ĐỘNG =====
 def auto_send_data():
@@ -173,21 +233,30 @@ def send_welcome(message):
     btn2 = types.KeyboardButton('🔔 Cảnh báo')
     btn3 = types.KeyboardButton('📈 Thống kê')
     btn4 = types.KeyboardButton('⏰ Tự động')
-    markup.add(btn1, btn2, btn3, btn4)
+    btn5 = types.KeyboardButton('🤖 AI')
+    btn6 = types.KeyboardButton('⚙️ Cài đặt AI')
+    markup.add(btn1, btn2, btn3, btn4, btn5, btn6)
     
     welcome_text = """
-🌡️ <b>Chào mừng đến với Hệ Thống Giám Sát IoT V5.1!</b>
+🌡️ <b>Chào mừng đến với Hệ Thống Giám Sát IoT V5.1 + AI!</b>
 
-Hệ thống giám sát môi trường thông minh.
+Hệ thống giám sát môi trường thông minh với phân tích AI.
 
 <b>Lệnh có sẵn:</b>
 /start - Bắt đầu
 /data - Xem dữ liệu hiện tại
 /subscribe - Đăng ký cảnh báo
 /unsubscribe - Hủy cảnh báo
-/auto_on - Bật gửi dữ liệu tự động (30 giây)
+/auto_on - Bật gửi dữ liệu tự động
 /auto_off - Tắt gửi tự động
 /stats - Xem thống kê chi tiết
+
+<b>🤖 Lệnh AI mới:</b>
+/ai_now - Phân tích AI ngay lập tức
+/ai_on - Bật phân tích AI định kỳ
+/ai_off - Tắt phân tích AI
+/ai_interval - Đặt chu kỳ phân tích (phút)
+
 /help - Hướng dẫn
 
 Hoặc dùng nút bên dưới! 👇
@@ -213,6 +282,12 @@ def send_help(message):
 
 <b>4. Thống kê:</b>
    /stats - Xem chi tiết đầy đủ
+
+<b>🤖 5. Phân tích AI (MỚI):</b>
+   /ai_now - Phân tích ngay lập tức
+   /ai_on - Bật phân tích định kỳ (mặc định 30 phút)
+   /ai_off - Tắt phân tích định kỳ
+   /ai_interval - Đặt chu kỳ (10-120 phút)
 
 <b>Ngưỡng cảnh báo:</b>
 🌡️ Nhiệt độ: 15-35°C
@@ -337,6 +412,100 @@ def send_stats(message):
     
     bot.send_message(message.chat.id, stats_text, parse_mode='HTML')
 
+# ===== LỆNH AI MỚI =====
+@bot.message_handler(commands=['ai_now'])
+def ai_analyze_now(message):
+    """Phân tích AI ngay lập tức"""
+    user_id = message.chat.id
+    
+    # Gửi thông báo đang xử lý
+    processing_msg = bot.send_message(user_id, "🤖 Đang phân tích bằng AI...\n⏳ Vui lòng đợi 5-10 giây")
+    
+    try:
+        result = analyze_environment(latest_data)
+        
+        # Xóa thông báo đang xử lý
+        bot.delete_message(user_id, processing_msg.message_id)
+        
+        if result['success']:
+            global latest_analysis
+            latest_analysis = result
+            
+            # Format đẹp cho Telegram
+            response = format_for_telegram(result)
+            
+            bot.send_message(user_id, response, parse_mode='HTML')
+        else:
+            bot.send_message(user_id, f"❌ <b>Lỗi phân tích AI:</b>\n{result['error']}", parse_mode='HTML')
+            
+    except Exception as e:
+        bot.delete_message(user_id, processing_msg.message_id)
+        bot.send_message(user_id, f"❌ <b>Lỗi:</b> {str(e)}", parse_mode='HTML')
+
+@bot.message_handler(commands=['ai_on'])
+def ai_on(message):
+    """Bật phân tích AI định kỳ"""
+    user_id = message.chat.id
+    ai_analysis_users.add(user_id)
+    
+    # Lấy interval hiện tại hoặc dùng mặc định
+    interval = user_ai_intervals.get(user_id, ANALYSIS_INTERVAL)
+    interval_minutes = interval // 60
+    
+    bot.send_message(user_id, 
+        f"🤖 Đã bật phân tích AI định kỳ!\n\n"
+        f"⏰ Chu kỳ hiện tại: {interval_minutes} phút\n"
+        f"📊 Bạn sẽ nhận phân tích AI tự động\n\n"
+        f"Dùng /ai_interval để thay đổi chu kỳ (10-120 phút)")
+
+@bot.message_handler(commands=['ai_off'])
+def ai_off(message):
+    """Tắt phân tích AI định kỳ"""
+    user_id = message.chat.id
+    if user_id in ai_analysis_users:
+        ai_analysis_users.remove(user_id)
+    bot.send_message(user_id, "🤖 Đã tắt phân tích AI định kỳ!")
+
+@bot.message_handler(commands=['ai_interval'])
+def ai_set_interval(message):
+    """Đặt chu kỳ phân tích AI"""
+    user_id = message.chat.id
+    
+    msg = bot.send_message(user_id, 
+        "⏰ Nhập chu kỳ phân tích AI (phút):\n\n"
+        "• Tối thiểu: 10 phút\n"
+        "• Tối đa: 120 phút\n"
+        "• Mặc định: 30 phút\n\n"
+        "Ví dụ: Nhập <code>15</code> cho 15 phút", 
+        parse_mode='HTML')
+    
+    bot.register_next_step_handler(msg, process_ai_interval)
+
+def process_ai_interval(message):
+    """Xử lý chu kỳ AI từ user"""
+    user_id = message.chat.id
+    
+    try:
+        minutes = int(message.text)
+        
+        if minutes < 10 or minutes > 120:
+            bot.send_message(user_id, 
+                "❌ Chu kỳ không hợp lệ!\n"
+                "Vui lòng nhập từ 10-120 phút.")
+            return
+        
+        # Lưu interval (chuyển sang giây)
+        user_ai_intervals[user_id] = minutes * 60
+        
+        bot.send_message(user_id, 
+            f"✅ Đã đặt chu kỳ phân tích AI: {minutes} phút\n\n"
+            f"Dùng /ai_on để bật phân tích tự động.")
+            
+    except ValueError:
+        bot.send_message(user_id, 
+            "❌ Vui lòng nhập số nguyên!\n"
+            "Ví dụ: 30")
+
 # ===== MESSAGE HANDLERS =====
 @bot.message_handler(func=lambda message: message.text == '📊 Dữ liệu')
 def handle_data_button(message):
@@ -366,13 +535,40 @@ def handle_auto_button(message):
         bot.send_message(user_id, "⏰ Gửi tự động đang TẮT.\n\n"
                                  "Gửi /auto_on để bật.")
 
+@bot.message_handler(func=lambda message: message.text == '🤖 AI')
+def handle_ai_button(message):
+    ai_analyze_now(message)
+
+@bot.message_handler(func=lambda message: message.text == '⚙️ Cài đặt AI')
+def handle_ai_settings_button(message):
+    user_id = message.chat.id
+    interval = user_ai_intervals.get(user_id, ANALYSIS_INTERVAL)
+    interval_minutes = interval // 60
+    status = "BẬT" if user_id in ai_analysis_users else "TẮT"
+    
+    settings_text = f"""
+⚙️ <b>CÀI ĐẶT AI</b>
+
+🤖 Trạng thái: {status}
+⏰ Chu kỳ: {interval_minutes} phút
+
+<b>Lệnh:</b>
+/ai_on - Bật phân tích định kỳ
+/ai_off - Tắt phân tích
+/ai_interval - Đặt chu kỳ (10-120 phút)
+/ai_now - Phân tích ngay
+    """
+    
+    bot.send_message(user_id, settings_text, parse_mode='HTML')
+
 # ===== MAIN =====
 if __name__ == '__main__':
     print("\n" + "="*50)
-    print("  🤖 Hệ Thống Giám Sát IoT V5.1 - Bot Telegram")
+    print("  🤖 Hệ Thống Giám Sát IoT V5.1 + AI - Bot Telegram")
     print("="*50)
     print(f"  MQTT Broker: {MQTT_BROKER}:{MQTT_PORT}")
     print(f"  Khoang gui tu dong: {AUTO_SEND_INTERVAL}s")
+    print(f"  Chu ky AI mac dinh: {ANALYSIS_INTERVAL // 60} phut")
     print("="*50 + "\n")
     
     # Chạy MQTT trong thread riêng
@@ -382,6 +578,10 @@ if __name__ == '__main__':
     # Chạy auto-send trong thread riêng
     auto_thread = threading.Thread(target=auto_send_data, daemon=True)
     auto_thread.start()
+    
+    # Chạy AI analysis trong thread riêng
+    ai_thread = threading.Thread(target=auto_ai_analysis, daemon=True)
+    ai_thread.start()
     
     # Chạy bot
     print("✓ Bot dang chay! Nhan Ctrl+C de dung.\n")

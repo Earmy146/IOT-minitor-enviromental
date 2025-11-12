@@ -227,7 +227,7 @@ void readSensors() {
               c8*temperature*humidity*humidity + 
               c9*temperature*temperature*humidity*humidity;
   
-  // Tính Comfort Index
+  // Tính chỉ số thoải mái
   float tempScore = max(0.0f, 100.0f - abs(24.0f - temperature) * 5);
   float humidScore = max(0.0f, 100.0f - abs(60.0f - humidity) * 2);
   float lightScore = min(100.0f, (lightLux / 10.0f));

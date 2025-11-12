@@ -1,24 +1,25 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO, emit
 import paho.mqtt.client as mqtt
 import json
-import threading
-from datetime import datetime
 import requests
+from datetime import datetime
+import threading
+import time
+from gemini_config import analyze_environment, get_short_summary, format_for_telegram
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'iot-secret-key-2024'
+app.config['SECRET_KEY'] = 'your-secret-key-here'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Cấu hình MQTT
+# ===== CẤU HÌNH =====
 MQTT_BROKER = "test.mosquitto.org"
 MQTT_PORT = 1883
 MQTT_TOPIC_DATA = "iot/env/data"
 MQTT_TOPIC_STATUS = "iot/env/status"
 
-# Cấu hình ThingSpeak
-THINGSPEAK_CHANNEL_ID = "3123035"
-THINGSPEAK_READ_API_KEY = "Z4CZ734O6MNLPA2U"
+THINGSPEAK_CHANNEL = "3123035"
+THINGSPEAK_READ_KEY = "OK6322WQLR29O7ZI"
 
 # Lưu trữ dữ liệu
 latest_data = {
@@ -33,124 +34,242 @@ latest_data = {
     'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 }
 
-history_data = []
-max_history = 50
+latest_ai_analysis = None  # Lưu phân tích AI mới nhất
+ai_analysis_interval = 30 * 60  # Mặc định 30 phút
+last_ai_analysis_time = 0
+ai_enabled = True  # Bật/tắt AI
 
-# MQTT Callbacks
+# ===== MQTT CALLBACKS =====
 def on_connect(client, userdata, flags, rc):
-    print(f"✓ Da ket noi MQTT Broker! (Ma: {rc})")
+    print(f"✓ Da ket noi MQTT! (Ma: {rc})")
     client.subscribe(MQTT_TOPIC_DATA)
     client.subscribe(MQTT_TOPIC_STATUS)
-    print(f"📡 Da dang ky:")
-    print(f"   - {MQTT_TOPIC_DATA}")
-    print(f"   - {MQTT_TOPIC_STATUS}")
 
 def on_message(client, userdata, msg):
-    global latest_data, history_data
+    global latest_data
     
     try:
         if msg.topic == MQTT_TOPIC_DATA:
             data = json.loads(msg.payload.decode())
             data['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            
             latest_data = data
             
-            history_data.append(data)
-            if len(history_data) > max_history:
-                history_data.pop(0)
-            
+            # Gửi qua WebSocket
             socketio.emit('sensor_update', data)
-            
-            print(f"📊 T={data['temp']}°C, H={data['humid']}%, L={data['light_lux']}Lux, G={data['gas_ppm']}PPM, Quat={'BAT' if data['fan'] else 'TAT'}")
+            print(f"📊 Cap nhat: T={data['temp']:.1f}°C, H={data['humid']:.1f}%")
             
         elif msg.topic == MQTT_TOPIC_STATUS:
             status = msg.payload.decode()
-            print(f"📢 Trang thai: {status}")
             socketio.emit('status_update', {'status': status})
+            print(f"📢 Trang thai: {status}")
             
-    except json.JSONDecodeError as e:
-        print(f"✗ Loi JSON: {e}")
     except Exception as e:
-        print(f"✗ Loi: {e}")
+        print(f"✗ Loi xu ly MQTT: {e}")
 
-def on_disconnect(client, userdata, rc):
-    if rc != 0:
-        print(f"⚠️ Mat ket noi MQTT. Dang ket noi lai...")
-
-# Khởi tạo MQTT
 mqtt_client = mqtt.Client()
 mqtt_client.on_connect = on_connect
 mqtt_client.on_message = on_message
-mqtt_client.on_disconnect = on_disconnect
 
 def start_mqtt():
     try:
-        print(f"🔌 Dang ket noi MQTT: {MQTT_BROKER}:{MQTT_PORT}")
         mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
         mqtt_client.loop_forever()
     except Exception as e:
         print(f"✗ Loi MQTT: {e}")
 
-mqtt_thread = threading.Thread(target=start_mqtt, daemon=True)
-mqtt_thread.start()
+# ===== PHÂN TÍCH AI TỰ ĐỘNG =====
+def auto_ai_analysis():
+    """Chạy phân tích AI định kỳ"""
+    global latest_ai_analysis, last_ai_analysis_time
+    
+    print(f"✓ Da bat phan tich AI tu dong (chu ky: {ai_analysis_interval // 60} phut)")
+    
+    while True:
+        try:
+            time.sleep(10)  # Kiểm tra mỗi 10 giây
+            
+            if not ai_enabled:
+                continue
+            
+            current_time = time.time()
+            
+            # Kiểm tra đã đến lúc phân tích chưa
+            if current_time - last_ai_analysis_time >= ai_analysis_interval:
+                print("🤖 Bat dau phan tich AI...")
+                
+                result = analyze_environment(latest_data)
+                
+                if result['success']:
+                    latest_ai_analysis = result
+                    
+                    # Gửi qua WebSocket
+                    socketio.emit('ai_analysis', {
+                        'analysis': result['analysis'],
+                        'priority': result['priority'],
+                        'timestamp': result['timestamp'],
+                        'summary': get_short_summary(result)
+                    })
+                    
+                    print(f"✓ Phan tich AI thanh cong - Muc do: {result['priority']}")
+                else:
+                    print(f"✗ Loi phan tich AI: {result['error']}")
+                
+                last_ai_analysis_time = current_time
+                
+        except Exception as e:
+            print(f"✗ Loi phan tich AI tu dong: {e}")
 
-# Routes
+# ===== ROUTES =====
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/api/data')
 def get_data():
+    """API lấy dữ liệu hiện tại"""
     return jsonify(latest_data)
-
-@app.route('/api/history')
-def get_history():
-    return jsonify(history_data)
 
 @app.route('/api/thingspeak')
 def get_thingspeak():
+    """API lấy dữ liệu từ ThingSpeak"""
     try:
-        url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/feeds.json"
-        params = {
-            'results': 20,
-            'api_key': THINGSPEAK_READ_API_KEY
-        }
-        print(f"📡 Dang lay du lieu ThingSpeak...")
-        response = requests.get(url, params=params, timeout=10)
-        data = response.json()
-        
-        if 'feeds' in data:
-            print(f"✓ Da lay {len(data['feeds'])} ban ghi")
-        
-        return jsonify(data)
+        url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL}/feeds.json?api_key={THINGSPEAK_READ_KEY}&results=100"
+        response = requests.get(url, timeout=10)
+        return jsonify(response.json())
     except Exception as e:
-        print(f"✗ Loi ThingSpeak: {e}")
         return jsonify({'error': str(e)}), 500
 
-# SocketIO Events
+@app.route('/api/ai/now', methods=['POST'])
+def ai_analyze_now():
+    """API phân tích AI ngay lập tức"""
+    try:
+        result = analyze_environment(latest_data)
+        
+        if result['success']:
+            global latest_ai_analysis
+            latest_ai_analysis = result
+            
+            return jsonify({
+                'success': True,
+                'analysis': result['analysis'],
+                'priority': result['priority'],
+                'timestamp': result['timestamp'],
+                'summary': get_short_summary(result)
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['error']
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/ai/latest')
+def get_latest_ai():
+    """API lấy phân tích AI mới nhất"""
+    if latest_ai_analysis and latest_ai_analysis['success']:
+        return jsonify({
+            'success': True,
+            'analysis': latest_ai_analysis['analysis'],
+            'priority': latest_ai_analysis['priority'],
+            'timestamp': latest_ai_analysis['timestamp'],
+            'summary': get_short_summary(latest_ai_analysis)
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': 'Chưa có phân tích nào'
+        })
+
+@app.route('/api/ai/config', methods=['GET', 'POST'])
+def ai_config():
+    """API cấu hình AI"""
+    global ai_analysis_interval, ai_enabled
+    
+    if request.method == 'POST':
+        data = request.json
+        
+        if 'interval' in data:
+            interval_minutes = int(data['interval'])
+            if 10 <= interval_minutes <= 120:
+                ai_analysis_interval = interval_minutes * 60
+                
+        if 'enabled' in data:
+            ai_enabled = bool(data['enabled'])
+        
+        return jsonify({
+            'success': True,
+            'interval_minutes': ai_analysis_interval // 60,
+            'enabled': ai_enabled
+        })
+    else:
+        return jsonify({
+            'interval_minutes': ai_analysis_interval // 60,
+            'enabled': ai_enabled
+        })
+
+# ===== WEBSOCKET EVENTS =====
 @socketio.on('connect')
 def handle_connect():
-    print('✓ Khach web da ket noi')
+    print('✓ Client da ket noi WebSocket')
     emit('sensor_update', latest_data)
+    
+    # Gửi phân tích AI nếu có
+    if latest_ai_analysis and latest_ai_analysis['success']:
+        emit('ai_analysis', {
+            'analysis': latest_ai_analysis['analysis'],
+            'priority': latest_ai_analysis['priority'],
+            'timestamp': latest_ai_analysis['timestamp'],
+            'summary': get_short_summary(latest_ai_analysis)
+        })
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print('✗ Khach web mat ket noi')
+    print('✗ Client da ngat ket noi')
 
+@socketio.on('request_ai_analysis')
+def handle_ai_request():
+    """Xử lý yêu cầu phân tích AI từ client"""
+    try:
+        result = analyze_environment(latest_data)
+        
+        if result['success']:
+            global latest_ai_analysis
+            latest_ai_analysis = result
+            
+            emit('ai_analysis', {
+                'analysis': result['analysis'],
+                'priority': result['priority'],
+                'timestamp': result['timestamp'],
+                'summary': get_short_summary(result)
+            })
+        else:
+            emit('ai_error', {'error': result['error']})
+            
+    except Exception as e:
+        emit('ai_error', {'error': str(e)})
+
+# ===== MAIN =====
 if __name__ == '__main__':
-    print("\n" + "="*60)
-    print("  🌐 Hệ Thống Giám Sát Môi Trường IoT V5.1")
-    print("="*60)
-    print(f"  MQTT Broker   : {MQTT_BROKER}:{MQTT_PORT}")
-    print(f"  ThingSpeak ID : {THINGSPEAK_CHANNEL_ID}")
-    print(f"  URL may chu   : http://localhost:5000")
-    print("="*60)
-    print("  📝 Tinh nang:")
-    print("     - Quat tu dong (BAT: ≥30°C, TAT: ≤28°C)")
-    print("     - Tinh toan chi so thoai mai")
-    print("     - Giam sat chi so nhiet")
-    print("     - CHE DO THU: Gia tri cam bien ngau nhien de kiem tra")
-    print("     - CHE DO THAT: Doc du lieu cam bien thuc te")
-    print("="*60 + "\n")
+    print("\n" + "="*50)
+    print("  🌐 Flask Web Server + AI - IoT Monitor V5.1")
+    print("="*50)
+    print(f"  MQTT Broker: {MQTT_BROKER}:{MQTT_PORT}")
+    print(f"  Chu ky AI: {ai_analysis_interval // 60} phut")
+    print(f"  Web: http://localhost:5000")
+    print("="*50 + "\n")
     
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    # Chạy MQTT trong thread riêng
+    mqtt_thread = threading.Thread(target=start_mqtt, daemon=True)
+    mqtt_thread.start()
+    
+    # Chạy AI analysis trong thread riêng
+    ai_thread = threading.Thread(target=auto_ai_analysis, daemon=True)
+    ai_thread.start()
+    
+    # Chạy Flask
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True, use_reloader=False)

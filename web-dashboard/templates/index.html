@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hệ Thống Giám Sát IoT V5.1</title>
+    <title>Hệ Thống Giám Sát IoT V5.1 + AI</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -11,7 +11,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>🌡️ Hệ Thống Giám Sát Môi Trường IoT V5.1</h1>
+            <h1>🌡️ Hệ Thống Giám Sát Môi Trường IoT V5.1 + AI</h1>
             <div class="status-bar">
                 <span id="connection-status" class="status-badge disconnected">Mất kết nối</span>
                 <span id="alert-badge" class="status-badge">OK</span>
@@ -77,6 +77,49 @@
             </div>
         </div>
 
+        <!-- Panel AI MỚI -->
+        <div class="ai-panel">
+            <div class="ai-header">
+                <h2>🤖 Phân Tích AI</h2>
+                <div class="ai-controls">
+                    <button id="btn-ai-now" class="btn btn-ai">Phân tích ngay</button>
+                    <button id="btn-ai-settings" class="btn btn-settings">⚙️ Cài đặt</button>
+                </div>
+            </div>
+            
+            <div id="ai-content" class="ai-content">
+                <div class="ai-placeholder">
+                    <span class="ai-icon">🤖</span>
+                    <p>Nhấn "Phân tích ngay" để xem đánh giá AI về môi trường</p>
+                </div>
+            </div>
+            
+            <div id="ai-timestamp" class="ai-timestamp"></div>
+        </div>
+
+        <!-- Modal cài đặt AI -->
+        <div id="ai-settings-modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>⚙️ Cài đặt Phân Tích AI</h2>
+                
+                <div class="setting-group">
+                    <label>
+                        <input type="checkbox" id="ai-enabled" checked>
+                        Bật phân tích AI tự động
+                    </label>
+                </div>
+                
+                <div class="setting-group">
+                    <label for="ai-interval">Chu kỳ phân tích (phút):</label>
+                    <input type="number" id="ai-interval" min="10" max="120" value="30">
+                    <small>Tối thiểu: 10 phút, Tối đa: 120 phút</small>
+                </div>
+                
+                <button id="btn-save-ai-settings" class="btn btn-primary">💾 Lưu cài đặt</button>
+            </div>
+        </div>
+
         <!-- Biểu đồ -->
         <div class="charts-section">
             <h2>📈 Biểu đồ thời gian thực</h2>
@@ -94,6 +137,7 @@
         <div class="info-panel">
             <h3>ℹ️ Thông tin hệ thống</h3>
             <ul>
+                <li>🤖 <strong>AI Gemini:</strong> Phân tích thông minh môi trường với Google Gemini Pro</li>
                 <li>🌀 <strong>Quạt tự động:</strong> BẬT khi nhiệt độ ≥ 30°C, TẮT khi nhiệt độ ≤ 28°C</li>
                 <li>📊 <strong>Định dạng dữ liệu:</strong> Nhiệt độ (°C), Độ ẩm (%), Ánh sáng (Lux), Khí gas (PPM)</li>
                 <li>🔄 <strong>Cập nhật cảm biến:</strong> Mỗi 2 giây</li>
@@ -101,7 +145,6 @@
                 <li>📡 <strong>MQTT:</strong> Mỗi 5 giây</li>
                 <li>💡 <strong>Đèn LED:</strong> Xanh=An toàn, Đỏ=Cảnh báo</li>
                 <li>🔊 <strong>Còi báo:</strong> Kêu khi có cảnh báo</li>
-                <li>🧪 <strong>Chế độ thử nghiệm:</strong> Giá trị cảm biến ngẫu nhiên để kiểm tra logic</li>
             </ul>
         </div>
 
@@ -121,11 +164,11 @@
         <div class="info-panel">
             <h3>✨ Tính năng chính</h3>
             <ul>
+                <li>🤖 <strong>AI Gemini:</strong> Phân tích và đánh giá môi trường tự động</li>
                 <li>🎯 <strong>Chỉ số thoải mái:</strong> Tính toán từ nhiệt độ, độ ẩm, ánh sáng, mức khí gas</li>
                 <li>🔥 <strong>Chỉ số nhiệt:</strong> Nhiệt độ "cảm giác như" thực tế</li>
                 <li>🌀 <strong>Quạt thông minh:</strong> Điều khiển tự động dựa trên nhiệt độ có chế độ trễ</li>
-                <li>📱 <strong>Bot Telegram:</strong> Giám sát & cảnh báo từ xa</li>
-                <li>🧪 <strong>Chế độ thử nghiệm:</strong> Đặt TEST_MODE = true trong code để dùng giá trị ngẫu nhiên</li>
+                <li>📱 <strong>Bot Telegram:</strong> Giám sát & cảnh báo từ xa với AI</li>
             </ul>
         </div>
 

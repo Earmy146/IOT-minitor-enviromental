@@ -103,11 +103,9 @@ async function loadThingSpeakData() {
             showAlert('success', 'Đã tải dữ liệu', `Đã tải ${data.feeds.length} bản ghi từ ThingSpeak`);
         } else {
             console.warn('⚠️ Khong co du lieu trong ThingSpeak');
-            showAlert('warning', 'Không có dữ liệu', 'Không có dữ liệu lịch sử');
         }
     } catch (error) {
         console.error('✗ Loi tai ThingSpeak:', error);
-        showAlert('danger', 'Lỗi', 'Không thể tải dữ liệu: ' + error.message);
     }
 }
 
@@ -245,6 +243,172 @@ function showAlert(type, title, message) {
     }, 5000);
 }
 
+// ===== XỬ LÝ AI =====
+function displayAIAnalysis(data) {
+    const aiContent = document.getElementById('ai-content');
+    const aiTimestamp = document.getElementById('ai-timestamp');
+    
+    // Xác định class priority
+    let priorityClass = 'low';
+    let priorityText = 'THẤP';
+    const priority = data.priority.toUpperCase();
+    
+    if (priority.includes('KHẨN CẤP')) {
+        priorityClass = 'critical';
+        priorityText = '🚨 KHẨN CẤP';
+    } else if (priority.includes('CAO')) {
+        priorityClass = 'high';
+        priorityText = '⚠️ CAO';
+    } else if (priority.includes('TRUNG BÌNH')) {
+        priorityClass = 'medium';
+        priorityText = '📊 TRUNG BÌNH';
+    } else {
+        priorityText = '✅ THẤP';
+    }
+    
+    // Parse analysis thành các section
+    let analysis = data.analysis;
+    
+    // Highlight các phần quan trọng
+    analysis = analysis.replace(/📝 ĐÁNH GIÁ/g, '<h3>📝 ĐÁNH GIÁ</h3>');
+    analysis = analysis.replace(/⚠️ VẤN ĐỀ CHÍNH/g, '<h3 class="warning">⚠️ VẤN ĐỀ CHÍNH</h3>');
+    analysis = analysis.replace(/💡 LỜI KHUYÊN/g, '<h3 class="advice">💡 LỜI KHUYÊN HÀNH ĐỘNG</h3>');
+    analysis = analysis.replace(/🎯 ƯU TIÊN/g, '<h3>🎯 MỨC ĐỘ ƯU TIÊN</h3>');
+    
+    // Thay bullet points
+    analysis = analysis.replace(/^- (.+)$/gm, '<li>$1</li>');
+    analysis = analysis.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+    
+    // Thay line breaks
+    analysis = analysis.replace(/\n\n/g, '</p><p>');
+    analysis = analysis.replace(/\n/g, '<br>');
+    
+    // Highlight các số liệu
+    analysis = analysis.replace(/(\d+\.?\d*)(°C|%|Lux|PPM)/g, '<strong class="metric">$1$2</strong>');
+    
+    aiContent.innerHTML = `
+        <div class="ai-analysis">
+            <div class="ai-priority ${priorityClass}">
+                ${priorityText}
+            </div>
+            <div class="analysis-content">
+                <p>${analysis}</p>
+            </div>
+            ${data.data_snapshot ? `
+            <div class="data-snapshot">
+                <h4>📊 Dữ liệu phân tích:</h4>
+                <div class="snapshot-grid">
+                    <span>🌡️ ${data.data_snapshot.temp}</span>
+                    <span>💧 ${data.data_snapshot.humid}</span>
+                    <span>💡 ${data.data_snapshot.light}</span>
+                    <span>☁️ ${data.data_snapshot.gas}</span>
+                    <span>😊 ${data.data_snapshot.comfort}</span>
+                </div>
+            </div>
+            ` : ''}
+        </div>
+    `;
+    
+    aiTimestamp.textContent = `⏰ Cập nhật: ${data.timestamp}`;
+    
+    // Hiển thị alert dựa trên mức độ ưu tiên
+    if (priorityClass === 'critical') {
+        showAlert('danger', '🚨 AI: KHẨN CẤP!', data.summary || 'Cần hành động ngay lập tức!');
+    } else if (priorityClass === 'high') {
+        showAlert('warning', '⚠️ AI: Cảnh báo', data.summary || 'Cần chú ý môi trường');
+    } else {
+        showAlert('info', '🤖 Phân tích AI', data.summary || 'Đã hoàn thành phân tích');
+    }
+}
+
+async function requestAIAnalysis() {
+    const aiContent = document.getElementById('ai-content');
+    const btnAiNow = document.getElementById('btn-ai-now');
+    
+    // Disable button và hiển thị loading
+    btnAiNow.disabled = true;
+    btnAiNow.textContent = 'Đang phân tích...';
+    
+    aiContent.innerHTML = `
+        <div class="ai-loading">
+            <div class="spinner"></div>
+        </div>
+    `;
+    
+    try {
+        const response = await fetch('/api/ai/now', {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayAIAnalysis(data);
+        } else {
+            aiContent.innerHTML = `
+                <div class="ai-placeholder">
+                    <span class="ai-icon">❌</span>
+                    <p>Lỗi: ${data.error}</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        aiContent.innerHTML = `
+            <div class="ai-placeholder">
+                <span class="ai-icon">❌</span>
+                <p>Không thể kết nối đến AI: ${error.message}</p>
+            </div>
+        `;
+    } finally {
+        btnAiNow.disabled = false;
+        btnAiNow.textContent = 'Phân tích ngay';
+    }
+}
+
+async function loadAISettings() {
+    try {
+        const response = await fetch('/api/ai/config');
+        const data = await response.json();
+        
+        document.getElementById('ai-enabled').checked = data.enabled;
+        document.getElementById('ai-interval').value = data.interval_minutes;
+    } catch (error) {
+        console.error('Lỗi tải cài đặt AI:', error);
+    }
+}
+
+async function saveAISettings() {
+    const enabled = document.getElementById('ai-enabled').checked;
+    const interval = parseInt(document.getElementById('ai-interval').value);
+    
+    if (interval < 10 || interval > 120) {
+        showAlert('danger', 'Lỗi', 'Chu kỳ phải từ 10-120 phút');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/ai/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                enabled: enabled,
+                interval: interval
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert('success', 'Đã lưu', `Chu kỳ AI: ${data.interval_minutes} phút`);
+            document.getElementById('ai-settings-modal').style.display = 'none';
+        }
+    } catch (error) {
+        showAlert('danger', 'Lỗi', 'Không thể lưu cài đặt');
+    }
+}
+
 // Sự kiện Socket
 socket.on('connect', () => {
     console.log('✓ Da ket noi may chu');
@@ -270,6 +434,16 @@ socket.on('status_update', (data) => {
     showAlert('info', 'Cập nhật trạng thái', data.status);
 });
 
+socket.on('ai_analysis', (data) => {
+    console.log('🤖 Phan tich AI:', data);
+    displayAIAnalysis(data);
+});
+
+socket.on('ai_error', (data) => {
+    console.error('❌ Loi AI:', data);
+    showAlert('danger', 'Lỗi AI', data.error);
+});
+
 // Khởi tạo
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 Dang khoi tao bang dieu khien...');
@@ -285,6 +459,43 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .catch(error => console.error('Loi:', error));
     
+    // Tải phân tích AI mới nhất
+    fetch('/api/ai/latest')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayAIAnalysis(data);
+            }
+        })
+        .catch(error => console.error('Loi:', error));
+    
     // Tải lại dữ liệu ThingSpeak mỗi 5 phút
     setInterval(loadThingSpeakData, 5 * 60 * 1000);
+    
+    // ===== EVENT LISTENERS =====
+    // Nút phân tích AI
+    document.getElementById('btn-ai-now').addEventListener('click', requestAIAnalysis);
+    
+    // Nút cài đặt AI
+    const modal = document.getElementById('ai-settings-modal');
+    const btnSettings = document.getElementById('btn-ai-settings');
+    const closeModal = document.querySelector('.close');
+    
+    btnSettings.addEventListener('click', () => {
+        loadAISettings();
+        modal.style.display = 'block';
+    });
+    
+    closeModal.addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+    
+    window.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+    
+    // Nút lưu cài đặt AI
+    document.getElementById('btn-save-ai-settings').addEventListener('click', saveAISettings);
 });
