@@ -69,11 +69,16 @@ mqtt_client.on_connect = on_connect
 mqtt_client.on_message = on_message
 
 def start_mqtt():
-    try:
-        mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
-        mqtt_client.loop_forever()
-    except Exception as e:
-        print(f"✗ Loi MQTT: {e}")
+    """MQTT với auto-reconnect"""
+    while True:
+        try:
+            print("🔌 Dang ket noi MQTT...")
+            mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+            mqtt_client.loop_forever()
+        except Exception as e:
+            print(f"✗ Loi MQTT: {e}")
+            print("🔄 Thu ket noi lai MQTT sau 10 giay...")
+            time.sleep(10)
 
 # ===== PHÂN TÍCH AI TỰ ĐỘNG =====
 def auto_ai_analysis():
@@ -583,6 +588,30 @@ if __name__ == '__main__':
     ai_thread = threading.Thread(target=auto_ai_analysis, daemon=True)
     ai_thread.start()
     
-    # Chạy bot
+    # Chạy bot với error handling và auto-reconnect
     print("✓ Bot dang chay! Nhan Ctrl+C de dung.\n")
-    bot.polling(none_stop=True)
+    
+    while True:
+        try:
+            # Polling với timeout ngắn hơn để tránh timeout lâu
+            bot.polling(none_stop=True, interval=0, timeout=20)
+            
+        except KeyboardInterrupt:
+            print("\n\n🛑 Dang dung bot...")
+            print("👋 Tam biet!")
+            break
+            
+        except Exception as e:
+            error_message = str(e)
+            
+            # Kiểm tra loại lỗi
+            if "timeout" in error_message.lower():
+                print(f"\n⚠️ Loi timeout: Ket noi Telegram bi gian doan")
+            elif "connection" in error_message.lower():
+                print(f"\n⚠️ Loi ket noi: Khong the ket noi den Telegram")
+            else:
+                print(f"\n⚠️ Loi: {error_message}")
+            
+            print("🔄 Thu ket noi lai sau 5 giay...")
+            time.sleep(5)
+            print("🔌 Dang ket noi lai...")
