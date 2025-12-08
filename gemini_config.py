@@ -2,7 +2,7 @@ import google.generativeai as genai
 from datetime import datetime
 
 # ===== CẤU HÌNH GEMINI =====
-GEMINI_API_KEY = "AIzaSyCrCLsotI6rKauU08ZHi7o9nIXJdtRkGgQ"  # Thay bằng API key của bạn
+GEMINI_API_KEY = ""  # Thay bằng API key của bạn
 ANALYSIS_INTERVAL = 30 * 60  # 30 phút (tính bằng giây)
 
 # Khởi tạo Gemini
